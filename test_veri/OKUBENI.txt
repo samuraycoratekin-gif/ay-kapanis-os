@@ -1,0 +1,110 @@
+AY KAPANIS OS - TEST VERISI (Mayis 2026 / donem 2026-05)
+============================================================
+
+Her firma klasorunde 13 dosya var. Kokpitte ilgili sekmeye yukleyin:
+
+  1_Mizan_2026-05.xlsx          -> "Mizan & Anomali" sekmesi (Yukle)
+                                   (Ayni mizan KDV, Finansal Analiz ve
+                                    Eksik Belge modullerini de otomatik besler)
+
+  2_Cari_Bizim_Defter.xlsx      -> "Cari Mutabakat" sekmesi, BIZIM slotu
+  3_Cari_Karsi_Ekstre.xlsx      -> "Cari Mutabakat" sekmesi, KARSI slotu
+
+  4_GIB_eFatura_Listesi.xlsx    -> "e-Fatura & KDV" sekmesi, GIB slotu
+  5_Defter_Alis_Faturalari.xlsx -> "e-Fatura & KDV" sekmesi, DEFTER slotu
+
+  6_Banka_Ekstresi.xlsx         -> "Banka Ekstre Esleme" sekmesi, BANKA slotu
+  7_Banka_Defteri_102.xlsx      -> "Banka Ekstre Esleme" sekmesi, DEFTER slotu
+
+  8_Demirbas_Listesi.xlsx       -> "Fis Uretici" sekmesi, AMORTISMAN slotu
+  9_Dovizli_Bakiyeler.xlsx      -> "Fis Uretici" sekmesi, KUR FARKI slotu
+  10_Senet_Cek_Listesi.xlsx     -> "Fis Uretici" sekmesi, REESKONT slotu
+
+  11_Tevkifat_Listesi.xlsx      -> "e-Fatura & KDV" sekmesi, TEVKIFAT slotu
+
+  13_Bordro_Icmal.xlsx          -> "Bordro & Muhasebe Mutabakati" sekmesi (Yukle)
+                                   (Mizan yuklu ise net<->335, SGK<->361,
+                                    vergi<->360, personel gider<->720/760/770
+                                    otomatik mutabik kilinir)
+
+Sonra "Fis Uretici" (KDV mahsup + banka komisyon + amortisman + kur farki +
+reeskont fisleri) ve
+"Kapanis Dosyasi" (toplu rapor + audit) sekmelerine bakin.
+
+MIZAN ICERIGI (~51 ana hesap, kumule Ocak-Mayis):
+--------------------------------------------------
+Hazir degerler (100,102,108), ticari alacaklar (120 ALICILAR x5, 121,126,128),
+ortak cari (131), stoklar (153,157,159), GELECEK AYLARA AIT GIDERLER (180),
+KDV (190 devreden,191,193), DURAN VARLIKLAR (252 binalar,253 makine,254 tasit,255 DEMIRBAS,
+256,260 haklar) + BIRIKMIS AMORTISMANLAR (257,268), 280 gelecek yillara ait gider,
+krediler (300,303,400), 320 SATICILAR x5, 321,326,335,340, ODENECEK VERGI/SGK
+(360,361,368,370), 380 gelecek aya ait gelir, 391 hesaplanan KDV, ozkaynak
+(500,570,580) ve gelir/gider (600,601,610,620,642,656,660,689,760,770).
+
+BEKLENEN SONUCLAR (dogrulama icin):
+-----------------------------------
+[Mizan & Anomali]
+* TERS BAKIYE: her firmada farkli ornek
+   - 02 Demir Celik : 100 KASA alacak (negatif kasa) + 159 verilen avans alacak
+   - 03 Gul Plastik : 360 Odenecek Vergi BORC bakiye (fazla odeme/mahsup)
+   - 04 Ceyhan      : 340 Alinan Siparis Avansi BORC bakiye
+* KAPANMAMIS GECICI HESAP: TUM firmalarda 191 Indirilecek + 391 Hesaplanan KDV
+   donem sonu bakiye veriyor (KDV mahsup fisi kesilmemis).
+* ANORMAL SAPMA: 02 Demir Celik'te 689 Olagandisi Gider sadece Mayis'ta ani giris
+   (Mayis = kapanan ay oldugu icin BULGU olarak listelenir).
+* AYLIK TREND: 254 Tasitlar Mart'ta 180.000 arac alimi -> "Aylik Hareket
+   Yogunlugu" mini grafiginde Mart sutunu yukselir. NOT: anormal sapma taramasi
+   yalnizca KAPANAN AYI (Mayis) denetler; gecmis ay sicramasi bulgu olarak cikmaz.
+
+[Cari Mutabakat]  bizim(2) + karsi(3) dosyalari
+* 120.01 ve 320.02 MUTABIK; 120.02 (karsida eksik fatura) ve 320.01
+  (5.000 tutar farki) FARKLI cikar.
+
+[e-Fatura & KDV]  GIB(4) + defter(5) + tevkifat(11) dosyalari
+* 3 fatura "GIB'de var defterde yok" = GIRILMEMIS ALIS FATURASI (tahmini kayip KDV).
+* KDV pozisyonu mizandan otomatik (191/391); beyanname taslagi.
+* DEVREDEN KDV (190) TAKIBI:
+   - 01/02/03 firmalari ODENECEK -> 190 hareketi yok (teyit gizli).
+   - 04 Ceyhan: onceki donemden 190 devir 72.000 + dusuk satisli Mayis (hesaplanan
+     63.000 < indirilecek 86.400) -> SONRAKI DONEME DEVREDEN 95.400. Mahsup fisi
+     kesilmedigi icin 190 hala 72.000; m4 "mahsup bekliyor" teyidi: fis kesilince
+     190 = 95.400 olmali (190/191/391 zinciri).
+* TEVKIFAT(11): 5 kalem, matrah 173.000 -> hesaplanan KDV 34.600.
+  Tevkif edilen 27.940 -> 360 (2 No.lu beyanname); indirilecek 6.660 -> 191.
+  Oran bos olan 2 kalemde (isgucu temin 9/10, makine bakim 7/10) standart GIB
+  tablosundan VARSAYILAN uygulanir -> "beyan oncesi dogrula" uyarisi.
+  "2 No.lu Beyanname Taslagini Yazdir" ile ciktisi alinir (son onay kullanicida).
+
+[Banka Ekstre Esleme]  banka(6) + defter102(7) dosyalari
+* 6 birebir eslesen + 1 TOPLU eslesme (1:N -> banka 120.000 = defter 70.000+50.000;
+  subset-sum sayesinde "eksik kayit" alarmi VERILMEZ), 4 komisyon
+  (havale/eft/hesap isletim+bsmv/pos), 1 defterde fazla (kasa devir).
+
+[Fis Uretici]  KDV mahsup fisi + 4 banka komisyon fisi onaya duser (ERP'ye
+  gondermek icin KULLANICI ONAYI gerekir -> otomatik kayit YOK).
+
+[Finansal Analiz]  bilanco DENK (denge_farki 0), gelir tablosu kari bilanco
+  donem sonucuyla birebir esit (gt_sapma 0). Demirbas/duran amortismani,
+  pesin giderler ve 7/A maliyetler dogru siniflanir.
+
+[Eksik Belge Avcisi]  03 Gul Plastik (mizandan, ek dosya gerekmez):
+* Duzenli Gider: 770 genel yonetim, 760 pazarlama, 660 kredi faizi Mayis'ta
+  gelmemis -> kira/elektrik/faiz belgesi/fisi eksik olabilir.
+* SGK/Vergi Tahakkuk: 361 SGK ve 360 gelir stopaji Mayis'ta durmus; operasyon
+  surerken (gider hareketi var) tahakkuk yok -> muhtasar/SGK fisi unutulmus.
+  (Ic tutarlilik uyarisi; kayit ONERILMEZ, son onay kullanicida.)
+
+[Bordro & Muhasebe Mutabakati]  bordro(13) + mizan(1) dosyalari
+* 01 Ornek Sanayi : MUTABIK -> net 37.170 = 335 Mayis, SGK 18.875 = 361 Mayis;
+  vergi 5.330 <= 360 hareketi, personel gideri 61.375 <= 770+760 (bulgu 0).
+* 02 / 04         : net/SGK Mayis hareketi bordrodan kucuk -> KESIN FARK cikar.
+* 03 Gul Plastik  : 361/360 Mayis tahakkuku neredeyse yok -> SGK/vergi/gider
+  tahakkuku EKSIK uyarilari (eksik profiliyle ortusur).
+* Bordro icmal IC TUTARLILIGI: brut-kesinti=net her firmada tutar (uyari yok).
+
+FIRMA PROFILLERI (panolar farkli gorunsun diye):
+* 01 Ornek Sanayi   : SAGLIKLI (cari ~1,6 / belirgin risk YOK)
+* 02 Demir Celik    : RISKLI (sermaye erimesi+likidite+asiri borc+ters bakiye+sapma)
+* 03 Gul Plastik    : EKSIK BELGE/TAHAKKUK (Mayis duzenli giderler gelmemis, 360 ters)
+* 04 Ceyhan Lojistik: DONEM ZARARI (4 kritik: likidite, negatif isletme serm.,
+                      asiri borc, donem zarari)

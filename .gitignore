@@ -1,0 +1,23 @@
+# Gercek musteri/mukellef verisi — ASLA repoya gitmez (KVKK)
+veri/
+*.tmp
+
+# Gecici sunucu cikti dokumleri
+_srv_*.txt
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Yuklenen test/ornek dosyalar
+test_dosyalar/
+*.xlsx.bak
+
+# Editor/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

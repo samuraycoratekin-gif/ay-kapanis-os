@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kapanış Kokpiti — Ay Kapanış OS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/static/stil.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo-area">
+        <h1><i class="fa-solid fa-compass-drafting"></i> Kapanış Kokpiti</h1>
+        <p id="musteri-adi">—</p>
+      </div>
+      <div class="header-meta">
+        <a class="btn-sec" href="/"><i class="fa-solid fa-arrow-left"></i> Ofis Panosu</a>
+        <div class="status-badge" title="Aktif kullanıcı — işlemler bu kişi adına kaydedilir">
+          <i class="fa-solid fa-user-tie" style="color:var(--accent-cyan)"></i>
+          <select id="kullanici-sec" onchange="kullaniciDegistir(this.value)"
+                  style="background:transparent;border:none;color:var(--text);font:inherit;cursor:pointer;outline:none;"></select>
+        </div>
+        <div class="status-badge" title="Dönem değiştir"><div class="pulse"></div><span>Dönem:</span>
+          <select id="donem-sec" onchange="donemDegistir(this.value)"
+                  style="background:transparent;border:none;color:var(--text);font:inherit;cursor:pointer;outline:none;"></select>
+        </div>
+        <div class="status-badge" id="kilit-rozet" style="display:none;"></div>
+        <button class="btn-sec" id="kilit-btn" onclick="kilitDegistir()" style="display:none;"></button>
+      </div>
+    </header>
+
+    <div class="dashboard-grid">
+      <aside class="sidebar">
+        <div class="nav-title">Kapanış Kontrolü</div>
+        <div id="nav-list"></div>
+      </aside>
+
+      <main class="content-container">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-header"><span>Genel İlerleme</span><i class="fa-solid fa-gauge-high" style="color:var(--accent-cyan)"></i></div><div class="stat-val" id="k-ilerleme">0%</div><div class="stat-desc">Modül ortalaması</div></div>
+          <div class="stat-card emerald"><div class="stat-header"><span>Biten Modül</span><i class="fa-solid fa-circle-check" style="color:var(--accent-emerald)"></i></div><div class="stat-val" id="k-biten">0</div><div class="stat-desc">Tamamlandı</div></div>
+          <div class="stat-card gold"><div class="stat-header"><span>Bekleyen</span><i class="fa-solid fa-hourglass" style="color:var(--accent-gold)"></i></div><div class="stat-val" id="k-bekleyen">0</div><div class="stat-desc">Sırada</div></div>
+          <div class="stat-card rose"><div class="stat-header"><span>Toplam Bulgu</span><i class="fa-solid fa-triangle-exclamation" style="color:var(--accent-rose)"></i></div><div class="stat-val" id="k-bulgu">0</div><div class="stat-desc"><span class="rose">Çözüm bekleyen</span></div></div>
+        </div>
+        <section class="panel" id="panel"></section>
+      </main>
+    </div>
+    <footer><p>Ay Kapanış OS &copy; 2026 · sürüm 1.0</p></footer>
+  </div>
+
+  <script>
+    // Oturum dustuyse (or. sunucu yeniden dagitildi) API 401 doner -> girise gonder.
+    (function(){ const _f = window.fetch;
+      window.fetch = (...a) => _f(...a).then(r => { if (r.status === 401) location.href = '/giris'; return r; }); })();
+    const qs = new URLSearchParams(location.search);
+    const MID = qs.get('m'), DONEM = qs.get('d');
+    let SECILI = null, MODULLER = [];
+    let AKTIF = null, ROLLER = {}, KILITLI = false;
+
+    async function init() {
+      document.getElementById('panel').innerHTML = iskelet();
+      await yukleKullanicilar();
+      const r = await fetch(`/api/kokpit?m=${MID}&d=${DONEM}`);
+      const d = await r.json();
+      if (d.hata) { document.getElementById('panel').innerText = d.hata; return; }
+      document.getElementById('musteri-adi').innerText = d.musteri.unvan + " · " + d.musteri.id;
+      const dsel = document.getElementById('donem-sec');
+      dsel.innerHTML = (d.donemler || [DONEM]).map(x =>
+        `<option value="${x}" ${x===DONEM?'selected':''}>${x}</option>`).join('');
+      MODULLER = d.moduller;
+      KILITLI = !!d.kilitli;
+      if (d.aktif_kullanici) AKTIF = d.aktif_kullanici;
+      cizKilit(d);
+      cizStats(d.durum);
+      cizNav(d.durum);
+      sec(MODULLER[0].kod);
+    }
+
+    async function yukleKullanicilar() {
+      const r = await fetch('/api/kullanicilar');
+      const d = await r.json();
+      ROLLER = d.roller || {};
+      AKTIF = d.aktif;
+      const sel = document.getElementById('kullanici-sec');
+      sel.innerHTML = (d.kullanicilar || []).map(k =>
+        `<option value="${k.id}" ${AKTIF && k.id===AKTIF.id ? 'selected' : ''}>${k.ad} — ${ROLLER[k.rol]||k.rol}</option>`
+      ).join('');
+    }
+
+    function donemDegistir(d) {
+      if (d === DONEM) return;
+      location.href = `/kokpit?m=${MID}&d=${d}`;
+    }
+
+    async function kullaniciDegistir(id) {
+      await fetch('/api/aktif_kullanici', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id})});
+      location.reload();
+    }
+
+    function cizKilit(d) {
+      const rozet = document.getElementById('kilit-rozet');
+      const btn = document.getElementById('kilit-btn');
+      const mudur = AKTIF && AKTIF.rol === 'mudur';
+      if (KILITLI) {
+        const kim = d.kilit_kullanici ? ` · ${d.kilit_kullanici}` : '';
+        rozet.style.display = '';
+        rozet.style.borderColor = 'var(--accent-rose)';
+        rozet.innerHTML = `<i class="fa-solid fa-lock" style="color:var(--accent-rose)"></i><span>Kilitli${kim}</span>`;
+      } else {
+        rozet.style.display = 'none';
+      }
+      // Buton yalnizca mudure gorunur
+      if (mudur) {
+        btn.style.display = '';
+        btn.innerHTML = KILITLI
+          ? '<i class="fa-solid fa-lock-open"></i> Kilidi Aç'
+          : '<i class="fa-solid fa-lock"></i> Dönemi Kilitle';
+      } else {
+        btn.style.display = 'none';
+      }
+    }
+
+    async function kilitDegistir() {
+      const yeni = !KILITLI;
+      if (yeni && !confirm('Dönem kilitlenecek. Kilitliyken dosya yüklenemez ve fiş işlemi yapılamaz. Devam edilsin mi?')) return;
+      const r = await fetch('/api/donem_kilit', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({m: MID, d: DONEM, kilitli: yeni})});
+      const d = await r.json();
+      if (d.hata) { alert(d.hata); return; }
+      location.reload();
+    }
+    function cizStats(durum) {
+      const m = Object.values(durum.moduller);
+      document.getElementById('k-ilerleme').innerText = durum.genel_ilerleme + "%";
+      document.getElementById('k-biten').innerText = m.filter(x => x.durum === 'tamam').length;
+      document.getElementById('k-bekleyen').innerText = m.filter(x => x.durum === 'bekliyor').length;
+      document.getElementById('k-bulgu').innerText = m.reduce((t,x) => t + (x.bulgu_sayisi||0), 0);
+    }
+    function cizNav(durum) {
+      const nav = document.getElementById('nav-list');
+      nav.innerHTML = MODULLER.map(mod => {
+        const md = durum.moduller[mod.kod] || {ilerleme:0};
+        return `<button class="nav-item ${mod.kod===SECILI?'active':''}" data-kod="${mod.kod}" onclick="sec('${mod.kod}')">
+          <span class="nav-item-left"><i class="fa-solid ${mod.ikon}"></i><span>${mod.ad}</span></span>
+          <span class="nav-progress">${md.ilerleme||0}%</span>
+        </button>`;
+      }).join('');
+    }
+    function iskelet() {
+      const kart = '<div class="skel-card skeleton"></div>';
+      const satir = '<div class="skel-line skeleton"></div>';
+      return `<div class="skel-wrap" aria-busy="true" aria-label="Yükleniyor">
+        <div class="skel-head skeleton"></div>
+        <div class="skel-cards">${kart.repeat(4)}</div>
+        ${satir}${satir}${satir}<div class="skel-line short skeleton"></div>
+      </div>`;
+    }
+
+    async function sec(kod) {
+      SECILI = kod;
+      document.querySelectorAll('.nav-item').forEach(b =>
+        b.classList.toggle('active', b.dataset.kod === kod));
+      document.getElementById('panel').innerHTML = iskelet();
+      const r = await fetch(`/api/modul?m=${MID}&d=${DONEM}&kod=${kod}`);
+      const d = await r.json();
+      document.getElementById('panel').innerHTML = d.html;
+      filtreVarsayilan();
+    }
+
+    // Canli kategori filtresi: stat kutucuguna tiklayinca ilgili bolumu gosterir.
+    // Kutucuk: class="stat-card filtre-kart" data-hedef="ters" (veya "all")
+    // Bolum:   class="filtre-bolum" data-grup="ters"
+    function bulguFiltrele(hedef, el) {
+      const panel = document.getElementById('panel');
+      if (!panel) return;
+      panel.querySelectorAll('.filtre-bolum').forEach(s => {
+        s.style.display = (hedef === 'all' || s.dataset.grup === hedef) ? '' : 'none';
+      });
+      panel.querySelectorAll('.filtre-kart').forEach(c => c.classList.remove('aktif'));
+      if (el) el.classList.add('aktif');
+      else {
+        const ilk = panel.querySelector('.filtre-kart[data-hedef="' + hedef + '"]');
+        if (ilk) ilk.classList.add('aktif');
+      }
+    }
+    // Panel her yuklendikten sonra varsayilan filtreyi (Toplam = hepsi) uygula.
+    function filtreVarsayilan() {
+      const panel = document.getElementById('panel');
+      if (!panel || !panel.querySelector('.filtre-kart')) return;
+      bulguFiltrele('all', null);
+      const all = panel.querySelector('.filtre-kart[data-hedef="all"]');
+      panel.querySelectorAll('.filtre-kart').forEach(c => c.classList.remove('aktif'));
+      if (all) all.classList.add('aktif');
+    }
+
+    async function yenileDurum() {
+      const r = await fetch(`/api/kokpit?m=${MID}&d=${DONEM}`);
+      const d = await r.json();
+      cizStats(d.durum); cizNav(d.durum);
+    }
+
+    async function yukleDosya(kod, inputId, rol) {
+      const inp = document.getElementById(inputId);
+      if (!inp.files.length) return;
+      const dosya = inp.files[0];
+      const durumEl = document.getElementById('yukleme-durum');
+      if (durumEl) durumEl.innerText = dosya.name + " yükleniyor, analiz ediliyor…";
+      const b64 = await new Promise((res) => {
+        const fr = new FileReader();
+        fr.onload = () => res(fr.result);
+        fr.readAsDataURL(dosya);
+      });
+      const r = await fetch('/api/yukle', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({m: MID, d: DONEM, kod, rol: rol||null, dosya_adi: dosya.name, dosya_b64: b64})});
+      const d = await r.json();
+      if (d.hata) { if (durumEl) durumEl.innerText = "Hata: " + d.hata; return; }
+      document.getElementById('panel').innerHTML = d.html;
+      filtreVarsayilan();
+      yenileDurum();
+    }
+
+    async function fisIslem(anahtar, islem) {
+      const r = await fetch('/api/fis_islem', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({m: MID, d: DONEM, anahtar, islem})});
+      const d = await r.json();
+      if (d.hata) { alert(d.hata); return; }
+      document.getElementById('panel').innerHTML = d.html;
+      filtreVarsayilan();
+      yenileDurum();
+    }
+
+    async function mutabakatModu(deger) {
+      document.getElementById('panel').innerHTML = iskelet();
+      const r = await fetch('/api/mutabakat_modu', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({m: MID, d: DONEM, deger})});
+      const d = await r.json();
+      if (d.hata) { document.getElementById('panel').innerHTML = "Hata: " + d.hata; return; }
+      document.getElementById('panel').innerHTML = d.html;
+      filtreVarsayilan();
+      yenileDurum();
+    }
+    init();
+  </script>
+</body>
+</html>

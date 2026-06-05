@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ofis Panosu — Ay Kapanış OS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/static/stil.css">
+  <style>
+    .ayar-girdi { width:100%; margin-top:8px; background:rgba(7,10,19,0.6); color:var(--text-main);
+      border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:8px 10px;
+      font-family:inherit; font-size:18px; font-weight:700; text-align:center; }
+    .ayar-girdi:focus { outline:none; border-color:var(--accent-cyan); }
+    .zh-satir { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+    .zh-satir input { background:rgba(7,10,19,0.6); color:var(--text-main);
+      border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:8px 10px;
+      font-family:inherit; font-size:13px; }
+    .zh-satir .zh-kod { width:90px; text-align:center; }
+    .zh-satir .zh-ad { flex:1; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo-area">
+        <h1><i class="fa-solid fa-compass-drafting"></i> Ay Kapanış OS</h1>
+        <p>Muhasebe Ofisi Panosu — tüm müşterilerin kapanış durumu</p>
+      </div>
+      <div class="header-meta">
+        <label style="display:flex;align-items:center;gap:8px;color:var(--text-muted);font-size:13px;">
+          <i class="fa-solid fa-calendar-days"></i> Dönem:
+          <select id="donem-sec" onchange="donemDegistir(this.value)"
+            style="background:rgba(7,10,19,0.6);color:var(--text-main);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:6px 10px;font-family:inherit;font-size:13px;"></select>
+        </label>
+        <div class="status-badge"><div class="pulse"></div><span>Aktif Dönem: <span id="aktif-donem"></span></span></div>
+      </div>
+    </header>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-header"><span>Toplam Müşteri</span><i class="fa-solid fa-users" style="color:var(--accent-cyan)"></i></div><div class="stat-val" id="s-musteri">0</div><div class="stat-desc">Aktif portföy</div></div>
+      <div class="stat-card emerald"><div class="stat-header"><span>Kapanışı Biten</span><i class="fa-solid fa-circle-check" style="color:var(--accent-emerald)"></i></div><div class="stat-val" id="s-biten">0</div><div class="stat-desc"><span class="green">%100 tamamlanan</span></div></div>
+      <div class="stat-card gold"><div class="stat-header"><span>Devam Eden</span><i class="fa-solid fa-spinner" style="color:var(--accent-gold)"></i></div><div class="stat-val" id="s-devam">0</div><div class="stat-desc">İşlem sürüyor</div></div>
+      <div class="stat-card rose"><div class="stat-header"><span>Toplam Bulgu</span><i class="fa-solid fa-triangle-exclamation" style="color:var(--accent-rose)"></i></div><div class="stat-val" id="s-bulgu">0</div><div class="stat-desc"><span class="rose">Çözüm bekleyen</span></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <h2><i class="fa-solid fa-list-check"></i> Müşteri Portföyü</h2>
+          <p>Bir müşteriye tıklayarak kapanış kokpitini açın.</p>
+        </div>
+        <button class="btn" onclick="musteriEkle()"><i class="fa-solid fa-plus"></i> Müşteri Ekle</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr><th>Kod</th><th>Ünvan</th><th>ERP</th><th>Genel İlerleme</th><th>Bulgu</th><th>Son Tarih</th><th></th></tr>
+          </thead>
+          <tbody id="musteri-tablo"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:18px;">
+      <div class="panel-header" style="cursor:pointer;" onclick="ayarlarAc()">
+        <div class="panel-title">
+          <h2><i class="fa-solid fa-sliders"></i> Tarama Ayarları</h2>
+          <p>Tüm müşterilere uygulanan eşikler ve zorunlu hesap listesi. Yalnızca müdür düzenleyebilir.</p>
+        </div>
+        <button class="btn-sec" id="ayar-tetik"><i class="fa-solid fa-chevron-down"></i> Aç / Kapat</button>
+      </div>
+      <div id="ayar-govde" style="display:none;">
+        <div class="stats-grid" style="margin-bottom:16px;">
+          <div class="stat-card">
+            <div class="stat-header"><span>Mizan Sapma Eşiği (%)</span><i class="fa-solid fa-chart-line" style="color:var(--accent-cyan)"></i></div>
+            <input id="ay-sapma-yuzde" type="number" min="0" step="10" class="ayar-girdi">
+            <div class="stat-desc">Güncel ay, önceki ort. bu kadar aşarsa uyarı</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-header"><span>Sapma Min. Tutar (TL)</span><i class="fa-solid fa-coins" style="color:var(--accent-gold)"></i></div>
+            <input id="ay-sapma-min" type="number" min="0" step="1000" class="ayar-girdi">
+            <div class="stat-desc">Bu altındaki sapma raporlanmaz</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-header"><span>Zorunlu Hesap Toleransı (TL)</span><i class="fa-solid fa-scale-balanced" style="color:var(--accent-emerald)"></i></div>
+            <input id="ay-zh-tol" type="number" min="0" step="1" class="ayar-girdi">
+            <div class="stat-desc">Bu altındaki bakiye "boş" sayılır</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-header"><span>Tevkifat Varsayılan</span><i class="fa-solid fa-percent" style="color:var(--accent-rose)"></i></div>
+            <div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-top:6px;">
+              <input id="ay-tev-pay" type="number" min="0" max="10" step="1" class="ayar-girdi" style="width:60px;text-align:center;">
+              <span style="font-size:22px;color:var(--text-muted);">/</span>
+              <input id="ay-tev-payda" type="number" min="1" step="1" class="ayar-girdi" style="width:60px;text-align:center;">
+            </div>
+            <div class="stat-desc">Listede oran yoksa uygulanır</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-header"><span>KDV Oran Toleransı (%)</span><i class="fa-solid fa-percent" style="color:var(--accent-cyan)"></i></div>
+            <input id="ay-kdv-yuzde" type="number" min="0" step="0.5" class="ayar-girdi">
+            <div class="stat-desc">Beyan↔mizan sapma bandı</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-header"><span>KDV Tutar Toleransı (TL)</span><i class="fa-solid fa-scale-balanced" style="color:var(--accent-cyan)"></i></div>
+            <input id="ay-kdv-tutar" type="number" min="0" step="100" class="ayar-girdi">
+            <div class="stat-desc">Bu altındaki fark raporlanmaz</div>
+          </div>
+        </div>
+
+        <h3 style="font-family:'Outfit',sans-serif;font-size:15px;margin:8px 0 10px;">
+          <i class="fa-solid fa-list-check" style="color:var(--accent-cyan)"></i> Zorunlu Kontrol Hesapları
+          <span style="font-size:12px;color:var(--text-muted);font-weight:400;">— dönem sonunda mizanda bulunması beklenen hesaplar</span>
+        </h3>
+        <div id="zh-liste"></div>
+        <button class="btn-sec" onclick="zhSatirEkle()" style="margin-top:8px;"><i class="fa-solid fa-plus"></i> Hesap Ekle</button>
+
+        <div style="margin-top:18px;display:flex;gap:10px;align-items:center;">
+          <button class="btn" onclick="ayarlarKaydet()"><i class="fa-solid fa-floppy-disk"></i> Ayarları Kaydet</button>
+          <button class="btn-sec" onclick="ayarlarYukle()"><i class="fa-solid fa-rotate-left"></i> Geri Al</button>
+          <span id="ayar-durum" style="font-size:13px;"></span>
+        </div>
+      </div>
+    </div>
+
+    <footer><p>Ay Kapanış OS &copy; 2026 · sürüm 1.0 · Akıllı Mutabakat'tan bağımsız ürün</p></footer>
+  </div>
+
+  <script>
+    // Oturum dustuyse (or. sunucu yeniden dagitildi) API 401 doner -> girise gonder.
+    (function(){ const _f = window.fetch;
+      window.fetch = (...a) => _f(...a).then(r => { if (r.status === 401) location.href = '/giris'; return r; }); })();
+    const qs = new URLSearchParams(location.search);
+    let DONEM = qs.get('d') || "";
+    function donemDegistir(v) { location.href = '/?d=' + v; }
+    // Son tarihe gore gecikti / yaklasiyor rozeti (bugune kiyasla).
+    function sonTarihHtml(m) {
+      if (!m.son_tarih) return '—';
+      const bugun = new Date(); bugun.setHours(0,0,0,0);
+      const hedef = new Date(m.son_tarih + 'T00:00:00');
+      if (isNaN(hedef)) return m.son_tarih;
+      const gun = Math.round((hedef - bugun) / 86400000);
+      const bitti = m.genel_ilerleme >= 100;
+      if (bitti) return `<span>${m.son_tarih}</span> <span class="badge success">tamam</span>`;
+      if (gun < 0) return `<span>${m.son_tarih}</span> <span class="badge err"><i class="fa-solid fa-triangle-exclamation"></i> ${-gun} gün gecikti</span>`;
+      if (gun <= 3) return `<span>${m.son_tarih}</span> <span class="badge warn"><i class="fa-solid fa-clock"></i> ${gun === 0 ? 'bugün' : gun + ' gün kaldı'}</span>`;
+      return `<span>${m.son_tarih}</span>`;
+    }
+    async function yukle() {
+      const r = await fetch('/api/ofis' + (DONEM ? ('?d=' + DONEM) : ''));
+      const d = await r.json();
+      DONEM = d.donem;
+      document.getElementById('aktif-donem').innerText = d.donem;
+      const sel = document.getElementById('donem-sec');
+      sel.innerHTML = (d.donemler || [d.donem]).map(x =>
+        `<option value="${x}" ${x===d.donem?'selected':''}>${x}</option>`).join('');
+      document.getElementById('s-musteri').innerText = d.musteriler.length;
+      document.getElementById('s-biten').innerText = d.musteriler.filter(m => m.genel_ilerleme >= 100).length;
+      document.getElementById('s-devam').innerText = d.musteriler.filter(m => m.genel_ilerleme > 0 && m.genel_ilerleme < 100).length;
+      document.getElementById('s-bulgu').innerText = d.musteriler.reduce((t,m) => t + m.bulgu, 0);
+
+      const tb = document.getElementById('musteri-tablo');
+      tb.innerHTML = d.musteriler.map(m => `
+        <tr class="row-link" onclick="location.href='/kokpit?m=${m.id}&d=${DONEM}'">
+          <td>${m.id}</td>
+          <td><strong>${m.unvan}</strong></td>
+          <td><span class="badge neutral">${m.erp_tipi}</span></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div class="progress-bar-container" style="flex:1;"><div class="progress-bar" style="width:${m.genel_ilerleme}%"></div></div>
+              <span style="color:var(--accent-cyan);font-weight:700;font-size:12px;">${m.genel_ilerleme}%</span>
+            </div>
+          </td>
+          <td>${m.bulgu > 0 ? `<span class="badge err">${m.bulgu}</span>` : `<span class="badge success">temiz</span>`}</td>
+          <td>${sonTarihHtml(m)}</td>
+          <td><i class="fa-solid fa-chevron-right" style="color:var(--text-muted)"></i></td>
+        </tr>`).join('');
+    }
+    async function musteriEkle() {
+      const unvan = prompt("Müşteri ünvanı:");
+      if (!unvan) return;
+      const vergi = prompt("Vergi no (opsiyonel):") || "";
+      await fetch('/api/musteri_ekle', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({unvan, vergi_no: vergi})});
+      yukle();
+    }
+    // --- Tarama Ayarlari ---
+    function ayarlarAc() {
+      const g = document.getElementById('ayar-govde');
+      const ac = g.style.display === 'none';
+      g.style.display = ac ? 'block' : 'none';
+      document.getElementById('ayar-tetik').innerHTML =
+        (ac ? '<i class="fa-solid fa-chevron-up"></i>' : '<i class="fa-solid fa-chevron-down"></i>') + ' Aç / Kapat';
+      if (ac && !g.dataset.yuklendi) { ayarlarYukle(); g.dataset.yuklendi = '1'; }
+    }
+    function zhSatir(kod, ad) {
+      const d = document.createElement('div');
+      d.className = 'zh-satir';
+      d.innerHTML = `<input class="zh-kod" maxlength="3" placeholder="100" value="${kod||''}">
+        <input class="zh-ad" placeholder="Hesap adı" value="${(ad||'').replace(/"/g,'&quot;')}">
+        <button class="btn-sec" onclick="this.parentNode.remove()" title="Sil"><i class="fa-solid fa-trash"></i></button>`;
+      return d;
+    }
+    function zhSatirEkle() { document.getElementById('zh-liste').appendChild(zhSatir('', '')); }
+    async function ayarlarYukle() {
+      const r = await fetch('/api/ayarlar');
+      const d = await r.json();
+      const a = d.ayarlar || {};
+      document.getElementById('ay-sapma-yuzde').value = a.mizan_sapma_yuzde ?? 100;
+      document.getElementById('ay-sapma-min').value = a.mizan_sapma_min_tutar ?? 100000;
+      document.getElementById('ay-zh-tol').value = a.zorunlu_hesap_tolerans ?? 1;
+      document.getElementById('ay-tev-pay').value = a.tevkifat_varsayilan_pay ?? 5;
+      document.getElementById('ay-tev-payda').value = a.tevkifat_varsayilan_payda ?? 10;
+      document.getElementById('ay-kdv-yuzde').value = a.kdv_oran_tolerans_yuzde ?? 2;
+      document.getElementById('ay-kdv-tutar').value = a.kdv_tutar_tolerans ?? 1000;
+      const liste = document.getElementById('zh-liste');
+      liste.innerHTML = '';
+      Object.entries(a.zorunlu_hesaplar || {}).forEach(([k, v]) => liste.appendChild(zhSatir(k, v)));
+      document.getElementById('ayar-durum').innerText = '';
+    }
+    async function ayarlarKaydet() {
+      const zorunlu = {};
+      document.querySelectorAll('#zh-liste .zh-satir').forEach(s => {
+        const kod = s.querySelector('.zh-kod').value.trim();
+        const ad = s.querySelector('.zh-ad').value.trim();
+        if (/^\d{3}$/.test(kod)) zorunlu[kod] = ad || kod;
+      });
+      const body = {
+        mizan_sapma_yuzde: parseFloat(document.getElementById('ay-sapma-yuzde').value) || 0,
+        mizan_sapma_min_tutar: parseFloat(document.getElementById('ay-sapma-min').value) || 0,
+        zorunlu_hesap_tolerans: parseFloat(document.getElementById('ay-zh-tol').value) || 0,
+        tevkifat_varsayilan_pay: parseInt(document.getElementById('ay-tev-pay').value) || 0,
+        tevkifat_varsayilan_payda: parseInt(document.getElementById('ay-tev-payda').value) || 10,
+        kdv_oran_tolerans_yuzde: parseFloat(document.getElementById('ay-kdv-yuzde').value) || 0,
+        kdv_tutar_tolerans: parseFloat(document.getElementById('ay-kdv-tutar').value) || 0,
+        zorunlu_hesaplar: zorunlu
+      };
+      const du = document.getElementById('ayar-durum');
+      du.innerText = 'Kaydediliyor...'; du.style.color = 'var(--text-muted)';
+      const r = await fetch('/api/ayarlar', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+      const d = await r.json();
+      if (d.ok) { du.innerText = '✓ Kaydedildi — sonraki taramalarda geçerli.'; du.style.color = 'var(--accent-emerald)'; }
+      else { du.innerText = '✗ ' + (d.hata || 'Kaydedilemedi'); du.style.color = 'var(--accent-rose)'; }
+    }
+    yukle();
+  </script>
+</body>
+</html>
