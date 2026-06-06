@@ -8,6 +8,34 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/static/stil.css">
+  <script>
+    (function(){
+      var TEMALAR = [
+        {kod:'lacivert', ad:'Lacivert', ikon:'fa-moon'},
+        {kod:'antrasit', ad:'Antrasit', ikon:'fa-circle-half-stroke'},
+        {kod:'acik', ad:'Açık', ikon:'fa-sun'}
+      ];
+      function uygula(kod){
+        document.documentElement.setAttribute('data-tema', kod);
+        var t = TEMALAR.filter(function(x){return x.kod===kod;})[0] || TEMALAR[0];
+        var btn = document.getElementById('tema-btn');
+        if (btn) btn.innerHTML = '<i class="fa-solid '+t.ikon+'"></i> '+t.ad;
+      }
+      var mevcut = 'lacivert';
+      try { mevcut = localStorage.getItem('aykapanis_tema') || 'lacivert'; } catch(e){}
+      document.documentElement.setAttribute('data-tema', mevcut);
+      window.temaDegistir = function(){
+        var akt = document.documentElement.getAttribute('data-tema');
+        var i = 0; for (var k=0;k<TEMALAR.length;k++){ if(TEMALAR[k].kod===akt){ i=k; break; } }
+        var yeni = TEMALAR[(i+1) % TEMALAR.length].kod;
+        try { localStorage.setItem('aykapanis_tema', yeni); } catch(e){}
+        uygula(yeni);
+      };
+      document.addEventListener('DOMContentLoaded', function(){
+        uygula(document.documentElement.getAttribute('data-tema'));
+      });
+    })();
+  </script>
 </head>
 <body>
   <div class="container">
@@ -17,6 +45,7 @@
         <p id="musteri-adi">—</p>
       </div>
       <div class="header-meta">
+        <button class="btn-sec" id="tema-btn" onclick="temaDegistir()" title="Tema değiştir (Lacivert / Antrasit / Açık)"><i class="fa-solid fa-moon"></i> Lacivert</button>
         <a class="btn-sec" href="/"><i class="fa-solid fa-arrow-left"></i> Ofis Panosu</a>
         <div class="status-badge" title="Aktif kullanıcı — işlemler bu kişi adına kaydedilir">
           <i class="fa-solid fa-user-tie" style="color:var(--accent-cyan)"></i>
@@ -39,11 +68,14 @@
       </aside>
 
       <main class="content-container">
-        <div class="stats-grid">
-          <div class="stat-card"><div class="stat-header"><span>Genel İlerleme</span><i class="fa-solid fa-gauge-high" style="color:var(--accent-cyan)"></i></div><div class="stat-val" id="k-ilerleme">0%</div><div class="stat-desc">Modül ortalaması</div></div>
-          <div class="stat-card emerald"><div class="stat-header"><span>Biten Modül</span><i class="fa-solid fa-circle-check" style="color:var(--accent-emerald)"></i></div><div class="stat-val" id="k-biten">0</div><div class="stat-desc">Tamamlandı</div></div>
-          <div class="stat-card gold"><div class="stat-header"><span>Bekleyen</span><i class="fa-solid fa-hourglass" style="color:var(--accent-gold)"></i></div><div class="stat-val" id="k-bekleyen">0</div><div class="stat-desc">Sırada</div></div>
-          <div class="stat-card rose"><div class="stat-header"><span>Toplam Bulgu</span><i class="fa-solid fa-triangle-exclamation" style="color:var(--accent-rose)"></i></div><div class="stat-val" id="k-bulgu">0</div><div class="stat-desc"><span class="rose">Çözüm bekleyen</span></div></div>
+        <div class="ozet-serit" title="Dönemin genel kapanış sağlığı — tüm modüllerin özeti">
+          <span class="ozet-baslik"><i class="fa-solid fa-heart-pulse"></i> Kapanış Sağlığı</span>
+          <span class="ozet-oge"><i class="fa-solid fa-gauge-high" style="color:var(--accent-cyan)"></i> İlerleme <strong id="k-ilerleme">0%</strong></span>
+          <span class="ozet-bar"><span class="ozet-bar-dolu" id="k-bar" style="width:0%"></span></span>
+          <span class="ozet-ayrac"></span>
+          <span class="ozet-oge"><i class="fa-solid fa-circle-check" style="color:var(--accent-emerald)"></i> <strong id="k-biten">0</strong> biten</span>
+          <span class="ozet-oge"><i class="fa-solid fa-hourglass" style="color:var(--accent-gold)"></i> <strong id="k-bekleyen">0</strong> bekleyen</span>
+          <span class="ozet-oge"><i class="fa-solid fa-triangle-exclamation" style="color:var(--accent-rose)"></i> <strong id="k-bulgu">0</strong> bulgu</span>
         </div>
         <section class="panel" id="panel"></section>
       </main>
@@ -136,15 +168,23 @@
     function cizStats(durum) {
       const m = Object.values(durum.moduller);
       document.getElementById('k-ilerleme').innerText = durum.genel_ilerleme + "%";
+      const bar = document.getElementById('k-bar');
+      if (bar) bar.style.width = durum.genel_ilerleme + "%";
       document.getElementById('k-biten').innerText = m.filter(x => x.durum === 'tamam').length;
       document.getElementById('k-bekleyen').innerText = m.filter(x => x.durum === 'bekliyor').length;
       document.getElementById('k-bulgu').innerText = m.reduce((t,x) => t + (x.bulgu_sayisi||0), 0);
     }
     function cizNav(durum) {
       const nav = document.getElementById('nav-list');
+      let onceki = null;
       nav.innerHTML = MODULLER.map(mod => {
         const md = durum.moduller[mod.kod] || {ilerleme:0};
-        return `<button class="nav-item ${mod.kod===SECILI?'active':''}" data-kod="${mod.kod}" onclick="sec('${mod.kod}')">
+        let baslik = '';
+        if (mod.grup && mod.grup !== onceki) {
+          baslik = `<div class="nav-grup-baslik">${mod.grup_ad}</div>`;
+          onceki = mod.grup;
+        }
+        return baslik + `<button class="nav-item ${mod.kod===SECILI?'active':''}" data-kod="${mod.kod}" onclick="sec('${mod.kod}')">
           <span class="nav-item-left"><i class="fa-solid ${mod.ikon}"></i><span>${mod.ad}</span></span>
           <span class="nav-progress">${md.ilerleme||0}%</span>
         </button>`;
@@ -226,6 +266,23 @@
     async function fisIslem(anahtar, islem) {
       const r = await fetch('/api/fis_islem', {method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({m: MID, d: DONEM, anahtar, islem})});
+      const d = await r.json();
+      if (d.hata) { alert(d.hata); return; }
+      document.getElementById('panel').innerHTML = d.html;
+      filtreVarsayilan();
+      yenileDurum();
+    }
+
+    async function geciciKaydet() {
+      const al = (k) => { const e = document.getElementById('gv_' + k); return e ? e.value : ''; };
+      const body = {m: MID, d: DONEM,
+        kkeg_gvk40: al('kkeg_gvk40'), kkeg_kvk11: al('kkeg_kvk11'),
+        kkeg_fgk: al('kkeg_fgk'), kkeg_diger: al('kkeg_diger'),
+        istisna: al('istisna'), gecmis_zarar: al('gecmis_zarar'),
+        onceki_hesaplanan: al('onceki_hesaplanan'), pesin_odenen: al('pesin_odenen'),
+        beyan_matrah: al('beyan_matrah')};
+      const r = await fetch('/api/gecici_vergi', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(body)});
       const d = await r.json();
       if (d.hata) { alert(d.hata); return; }
       document.getElementById('panel').innerHTML = d.html;

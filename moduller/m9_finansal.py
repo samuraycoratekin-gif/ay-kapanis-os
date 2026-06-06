@@ -130,7 +130,7 @@ def panel_html(sonuc):
     # iki giris karti -> ayri sayfada rapor acar
     kartlar = """
     <div class="feature-grid" style="margin:18px 0;">
-      <div class="feature-box" style="cursor:pointer;border:1px solid rgba(56,189,248,0.25);"
+      <div class="feature-box" style="cursor:pointer;border:1px solid rgba(20,184,166,0.25);"
            onclick="window.open('/rapor'+location.search+'&tip=gelir','_blank')">
         <h3><i class="fa-solid fa-file-invoice-dollar" style="color:var(--accent-cyan)"></i> Gelir Tablosu</h3>
         <p>Brüt satıştan dönem kârına kademeli gelir tablosu, kâr marjları ve aylık satış/kâr trendi.
@@ -166,26 +166,47 @@ def panel_html(sonuc):
 # --------------------------------------------------------------------------- #
 _ZON_RENK = {"guvenli": "var(--accent-emerald)", "gri": "var(--accent-gold)",
              "riskli": "var(--accent-rose)"}
+_ZON_YORUM = {
+    "guvenli": "Şirket mali açıdan sağlam görünüyor — yakın vadede ödeme güçlüğü/iflas riski düşük.",
+    "gri": "Belirsiz bölge — açık bir tehlike yok ama zayıflama sinyalleri var; nakit ve borçluluk yakından izlenmeli.",
+    "riskli": "Mali baskı sinyali yüksek — kârlılık, borçluluk ve nakit durumu acil gözden geçirilmeli. (Tek başına iflas demek değildir, erken uyarıdır.)",
+}
+# T1..T5 -> (kisa ad, neyi olcer)
+_ALTMAN_BILESEN = {
+    "T1": ("İşletme sermayesi", "Dönen varlıkların kısa vadeli borçları karşılama gücü (likidite)"),
+    "T2": ("Birikmiş kârlar", "Şirketin yıllar içinde içeride biriktirdiği öz finansman gücü"),
+    "T3": ("Faaliyet kârlılığı", "Esas işin (faiz/vergi öncesi) varlıklara göre ne kadar kâr ürettiği"),
+    "T4": ("Özkaynak / Borç", "Sermayenin borçlara göre tamponu — yüksekse borç baskısı düşük"),
+    "T5": ("Aktif devir hızı", "Varlıkların satışa dönüşme verimi — yüksekse varlıklar etkin kullanılıyor"),
+}
 
 
 def _altman_blok(al):
     if not al or not al.get("hesaplanabilir"):
         return ('<div class="notif-pill" style="margin-top:16px"><div class="circle-icon-badge" '
-                'style="background:var(--accent-gold)"></div><span><strong>Altman Z\'-Score</strong> '
+                'style="background:var(--accent-gold)"></div><span><strong>Finansal Sağlık Skoru</strong> '
                 'hesaplanamadı — toplam aktif veya toplam borç sıfır/negatif.</span></div>')
     z = al["z"]
     renk = _ZON_RENK.get(al["zon"], "var(--text-muted)")
     # 0..6 araligini bar olarak goster; isaretci z konumunda
     oran = max(0.0, min(1.0, z / 6.0))
     bilesen = al["bilesenler"]
-    bil_html = " · ".join(f"T{i}={bilesen[f'T{i}']:.2f}" for i in range(1, 6))
+    cipler = "".join(
+        f'<span title="{_ALTMAN_BILESEN[f"T{i}"][1]}" '
+        f'style="display:inline-flex;flex-direction:column;gap:1px;padding:5px 9px;border-radius:8px;'
+        f'background:rgba(255,255,255,0.04);border:1px solid var(--border-color);cursor:help;">'
+        f'<span style="font-size:10px;color:var(--text-muted);">{_ALTMAN_BILESEN[f"T{i}"][0]}</span>'
+        f'<span style="font-size:13px;font-weight:700;">{bilesen[f"T{i}"]:.2f}</span></span>'
+        for i in range(1, 6))
     return f"""
     <div style="margin-top:18px;padding:18px;border:1px solid {renk}55;border-radius:14px;background:rgba(7,10,19,0.35);">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-        <div>
-          <h4 style="margin:0 0 4px;font-size:15px;"><i class="fa-solid fa-gauge-high" style="color:{renk}"></i>
-            Altman Z'-Score <span style="color:var(--text-muted);font-weight:400;font-size:12px;">(özel sermayeli firma modeli)</span></h4>
-          <p style="margin:0;font-size:12px;color:var(--text-muted);">{bil_html}</p>
+        <div style="max-width:62%;">
+          <h4 style="margin:0 0 4px;font-size:15px;"><i class="fa-solid fa-heart-pulse" style="color:{renk}"></i>
+            Finansal Sağlık Skoru <span style="color:var(--text-muted);font-weight:400;font-size:12px;">(Altman Z′ — özel sermayeli firma)</span></h4>
+          <p style="margin:0;font-size:12px;color:var(--text-muted);line-height:1.5;">
+            Şirketin <strong>yakın vadede mali sıkıntıya / iflasa girme riskini</strong> ölçen erken uyarı skoru.
+            5 finansal oran tek bir nota indirgenir; <strong>yüksek skor = sağlam</strong>.</p>
         </div>
         <div style="text-align:right;">
           <div style="font-family:'Outfit',sans-serif;font-size:30px;font-weight:800;color:{renk};line-height:1;">{z:.2f}</div>
@@ -198,6 +219,12 @@ def _altman_blok(al):
       </div>
       <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:4px;">
         <span>0 — sıkıntı</span><span>1,23</span><span>2,9 — güvenli</span><span>6+</span>
+      </div>
+      <p style="margin:12px 0 0;font-size:12.5px;line-height:1.55;color:var(--text-main);">
+        <i class="fa-solid fa-circle-info" style="color:{renk}"></i> {_ZON_YORUM.get(al['zon'], '')}</p>
+      <div style="margin-top:12px;">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Skoru oluşturan 5 ölçü <span style="opacity:.7;">(üzerine gelince ne olduğu görünür)</span>:</div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;">{cipler}</div>
       </div>
     </div>"""
 
@@ -237,7 +264,7 @@ def _nakit_akis_blok(n):
           <tr><th>Vade Dönemi</th><th style="text-align:right">Giriş (alacak)</th>
               <th style="text-align:right">Çıkış (borç)</th><th style="text-align:right">Net</th>
               <th style="text-align:right">Tahmini Nakit</th></tr>
-          <tr style="background:rgba(56,189,248,0.06);">
+          <tr style="background:rgba(20,184,166,0.06);">
             <td><strong>Başlangıç Nakit</strong></td><td colspan="3"></td>
             <td style="text-align:right;font-weight:700">{_tl0(n["baslangic"])}</td></tr>
           {satirlar}
@@ -298,7 +325,7 @@ def _svg_trend_blok(trend, guncel_ay=None):
     W, H = 720, 260
     ml, mr, mt, mb = 54, 16, 18, 34
     iw, ih = W - ml - mr, H - mt - mb
-    seriler = [("net_satis", "Net Satış", "#38bdf8"), ("donem_kari", "Dönem Kârı", "#34d399")]
+    seriler = [("net_satis", "Net Satış", "#14b8a6"), ("donem_kari", "Dönem Kârı", "#34d399")]
     tum = [t[k] for t in dolu for k, _, _ in seriler]
     vmax, vmin = max(tum), min(tum)
     if vmax == vmin:
@@ -370,7 +397,7 @@ def _risk_listesi(rsk):
 # --------------------------------------------------------------------------- #
 def _gt_satir(ad, deger, kalin=False, ara=False):
     st = "font-weight:700;" if kalin else ""
-    bg = 'background:rgba(56,189,248,0.06);' if ara else ""
+    bg = 'background:rgba(20,184,166,0.06);' if ara else ""
     return (f'<tr style="{bg}"><td style="{st}">{ad}</td>'
             f'<td style="text-align:right;{st}">{_tl(deger)}</td></tr>')
 
@@ -467,7 +494,7 @@ def _rapor_bilanco(a):
       <tr><td style="padding-left:22px;color:var(--text-muted)">· Ticari Alacaklar</td><td style="text-align:right">{_tl0(b['ticari_alacak'])}</td><td colspan="2"></td></tr>
       <tr><td style="padding-left:22px;color:var(--text-muted)">· Stoklar</td><td style="text-align:right">{_tl0(b['stok'])}</td><td colspan="2"></td></tr>
       {_bil_satir("Duran Varlıklar", kk["duran"], kalin=True)}
-      <tr style="background:rgba(56,189,248,0.06);font-weight:700"><td>TOPLAM AKTİF</td><td style="text-align:right">{_tl0(kk['aktif']['guncel'])}</td><td style="text-align:right">{_tl0(kk['aktif']['acilis'])}</td><td style="text-align:right">{_yuzde(kk['aktif']['yuzde'])}</td></tr>
+      <tr style="background:rgba(20,184,166,0.06);font-weight:700"><td>TOPLAM AKTİF</td><td style="text-align:right">{_tl0(kk['aktif']['guncel'])}</td><td style="text-align:right">{_tl0(kk['aktif']['acilis'])}</td><td style="text-align:right">{_yuzde(kk['aktif']['yuzde'])}</td></tr>
     </table></div>"""
 
     pasif = f"""
@@ -521,4 +548,4 @@ def rapor_govde(sonuc, tip):
     return _rapor_bilanco(a)
 
 
-kaydet(Modul("m9_finansal", AD, "fa-chart-line", 10, calistir, panel_html))
+kaydet(Modul("m9_finansal", AD, "fa-chart-line", 9, calistir, panel_html))

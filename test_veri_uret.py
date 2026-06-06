@@ -15,6 +15,8 @@ Calistirma:  python test_veri_uret.py
 Cikti:       test_veri/<Firma>/...   + OKUBENI.txt
 """
 import os
+import calendar
+from datetime import date
 from openpyxl import Workbook
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -490,6 +492,66 @@ def yaz_bordro(firma, klasor):
 
 
 # --------------------------------------------------------------------------- #
+# KREDI ODEME PLANI (M5 Banka -> "Krediler" bolumu)
+# Bir uzun vadeli TL kredi (400/303 reclass + donem faizi), bir kisa vadeli TL
+# kredi (300) ve bir dovizli (USD) kredi (656/646 kur farki) iceren amortisman tablosu.
+# --------------------------------------------------------------------------- #
+def _ay_ekle(d, k):
+    m = d.month - 1 + k
+    y = d.year + m // 12
+    m = m % 12 + 1
+    gun = min(d.day, calendar.monthrange(y, m)[1])
+    return date(y, m, gun)
+
+
+def yaz_kredi(firma, klasor):
+    ol = firma["olcek"]
+    bas = ["Kredi", "Taksit No", "Vade", "Taksit Tutarı", "Anapara", "Faiz",
+           "Kalan Anapara", "Döviz", "Defter Kur", "Güncel Kur"]
+    rows = []
+
+    def amort(ad, anapara_top, yillik, n, baslangic, doviz="TL", dk="", gk=""):
+        r = yillik / 12 / 100.0
+        bakiye = anapara_top
+        taksit = anapara_top * r / (1 - (1 + r) ** (-n))
+        for i in range(1, n + 1):
+            faiz = bakiye * r
+            ana = taksit - faiz
+            bakiye -= ana
+            vade = _ay_ekle(baslangic, i - 1)
+            rows.append([ad, i, vade.isoformat(), round(taksit, 2), round(ana, 2),
+                         round(faiz, 2), round(max(bakiye, 0), 2), doviz, dk, gk])
+
+    # Uzun vadeli TL (24 ay) -> 400/303 reclass + dönem faizi
+    amort("İş Bankası Yatırım Kredisi", _o(600_000, ol), 48, 24, date(2026, 1, 5))
+    # Kısa vadeli TL (10 ay) -> 300
+    amort("Ziraat İşletme Kredisi", _o(180_000, ol), 36, 10, date(2026, 2, 10))
+    # Dövizli (USD, 18 ay) -> 656/646 kur farkı (anapara USD cinsinden)
+    if firma["profil"] == "eksik":
+        amort("Garanti USD Kredisi", 40_000, 9, 18, date(2026, 3, 15), doviz="USD")  # kur bos -> uyari
+    else:
+        amort("Garanti USD Kredisi", 40_000, 9, 18, date(2026, 3, 15),
+              doviz="USD", dk=32.50, gk=34.20)
+
+    _yaz(os.path.join(klasor, "14_Kredi_Odeme_Plani.xlsx"), bas, rows, "Kredi Plani")
+
+
+# --------------------------------------------------------------------------- #
+# SGK ISTIRAHAT / RAPOR LISTESI (M12 Bordro -> "SGK Rapor Kontrolu" bolumu)
+# Bordrodaki personel adlariyla eslesen 2 istirahat + bordroda OLMAYAN 1 is kazasi.
+# --------------------------------------------------------------------------- #
+def yaz_sgk(firma, klasor):
+    bas = ["Personel", "Rapor Türü", "Rapor Başlangıç", "Rapor Bitiş", "Rapor Gün Sayısı"]
+    rows = [
+        ["Personel 03 - Üretim", "İstirahat", "2026-05-04", "2026-05-08", 5],
+        ["Personel 04 - Destek", "İstirahat", "2026-05-20", "2026-05-22", 3],
+        # Bordro icmalinde OLMAYAN personel -> "bordroda yok" uyarisi; is kazasi -> ilk gunden SGK
+        ["Personel 09 - Sevkiyat", "İş kazası", "2026-05-12", "2026-05-19", 8],
+    ]
+    _yaz(os.path.join(klasor, "15_SGK_Rapor_Listesi.xlsx"), bas, rows, "SGK Rapor")
+
+
+# --------------------------------------------------------------------------- #
 OKUBENI = """AY KAPANIS OS - TEST VERISI (Mayis 2026 / donem 2026-05)
 ============================================================
 
@@ -619,7 +681,9 @@ def main():
         yaz_tevkifat(firma, klasor)
         yaz_kdv_matrah(firma, klasor)
         yaz_bordro(firma, klasor)
-        print(f"  OK  {firma['kod']} {firma['ad']}  -> {firma['kisa']}/ (13 dosya)")
+        yaz_kredi(firma, klasor)
+        yaz_sgk(firma, klasor)
+        print(f"  OK  {firma['kod']} {firma['ad']}  -> {firma['kisa']}/ (15 dosya)")
     print(f"\nTest verisi hazir: {COK}")
 
 

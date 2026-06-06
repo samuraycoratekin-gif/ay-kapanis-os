@@ -5,19 +5,44 @@ Iki dosya: rol="banka" (banka ekstresi) ve rol="defter" (ERP 102 banka hareketle
 Tutar+tarih eslestirmesi; eslesmeyenlere fis onerisi, komisyon/masraf tespiti.
 """
 from core.moduller import Modul, kaydet
-from core import depo, banka_oku, banka_analiz
+from core import depo, banka_oku, banka_analiz, kredi_oku, kredi_analiz
 
 AD = "Banka Ekstre Eşleme"
 ACIKLAMA = "Banka ekstresi ↔ ERP 102 banka hareketleri eşleştirilir; eşleşmeyenlere fiş önerilir."
 
 
+def _kredi_oku(musteri_id, donem):
+    """Kredi odeme plani (bagimsiz slot) varsa analiz et; yoksa None."""
+    kredi_yol = depo.yuklenen_bul(musteri_id, donem, "m5_banka", rol="kredi")
+    if not kredi_yol:
+        return None
+    try:
+        krediler = kredi_oku.oku(kredi_yol)
+        return kredi_analiz.analiz(krediler, donem)
+    except Exception as e:
+        return {"hata": str(e)}
+
+
+def _kredi_bulgu(kredi):
+    return kredi["bulgu"] if (kredi and not kredi.get("hata")) else 0
+
+
 def calistir(musteri_id, donem):
     banka_yol = depo.yuklenen_bul(musteri_id, donem, "m5_banka", rol="banka")
     defter_yol = depo.yuklenen_bul(musteri_id, donem, "m5_banka", rol="defter")
+    kredi = _kredi_oku(musteri_id, donem)
+    kbulgu = _kredi_bulgu(kredi)
     if not (banka_yol and defter_yol):
+        if kredi is None:
+            durum, ilerleme = "bekliyor", 0
+        elif kredi.get("hata"):
+            durum, ilerleme = "hata", 0
+        else:
+            durum, ilerleme = (("uyari", 40) if kbulgu else ("tamam", 40))
         depo.modul_durum_guncelle(musteri_id, donem, "m5_banka",
-                                  durum="bekliyor", ilerleme=0, bulgu_sayisi=0)
-        return {"hazir": False, "banka": bool(banka_yol), "defter": bool(defter_yol)}
+                                  durum=durum, ilerleme=ilerleme, bulgu_sayisi=kbulgu)
+        return {"hazir": False, "banka": bool(banka_yol), "defter": bool(defter_yol),
+                "kredi": kredi}
     try:
         banka = banka_oku.oku(banka_yol, kaynak="banka")
         defter = banka_oku.oku(defter_yol, kaynak="defter")
@@ -25,13 +50,14 @@ def calistir(musteri_id, donem):
     except Exception as e:
         depo.modul_durum_guncelle(musteri_id, donem, "m5_banka",
                                   durum="hata", ilerleme=0, bulgu_sayisi=0)
-        return {"hazir": True, "hata": str(e)}
-    sorunlu = r["sorunlu"]
+        return {"hazir": True, "hata": str(e), "kredi": kredi}
+    toplam_bulgu = r["sorunlu"] + kbulgu
     depo.modul_durum_guncelle(musteri_id, donem, "m5_banka",
-                              durum=("tamam" if sorunlu == 0 else "uyari"),
-                              ilerleme=(100 if sorunlu == 0 else 60),
-                              bulgu_sayisi=sorunlu)
+                              durum=("tamam" if toplam_bulgu == 0 else "uyari"),
+                              ilerleme=(100 if toplam_bulgu == 0 else 60),
+                              bulgu_sayisi=toplam_bulgu)
     r["hazir"] = True
+    r["kredi"] = kredi
     return r
 
 
@@ -68,7 +94,9 @@ def _yukleme(sonuc):
             '<div style="display:flex;gap:16px;flex-wrap:wrap;">' +
             _slot("banka", "Banka Ekstresi", sonuc.get("banka")) +
             _slot("defter", "ERP 102 Banka Hareketleri", sonuc.get("defter")) +
-            '</div><p id="yukleme-durum" style="margin-top:14px;font-size:12px;color:var(--accent-cyan);"></p>')
+            _slot("kredi", "Kredi Ödeme Planı (opsiyonel)", bool(sonuc.get("kredi"))) +
+            '</div><p id="yukleme-durum" style="margin-top:14px;font-size:12px;color:var(--accent-cyan);"></p>' +
+            _kredi_blok(sonuc.get("kredi")))
 
 
 def _yeniden():
@@ -115,11 +143,79 @@ def _bolum_coklu(sonuc):
             f'<tr><th>Yön</th><th>Tarih</th><th>Toplu Hareket</th><th>Karşılığı</th></tr>{sat}</table></div></div>')
 
 
+def _kredi_slot_yeniden():
+    var = True
+    return ('<button class="btn-sec" onclick="document.getElementById(\'banka-kredi\').click()"><i class="fa-solid fa-rotate"></i> Kredi planını değiştir</button>'
+            '<input type="file" id="banka-kredi" accept=".xls,.xlsx,.xlsm" style="display:none" onchange="yukleDosya(\'m5_banka\',\'banka-kredi\',\'kredi\')">')
+
+
+def _kredi_blok(kredi):
+    """Banka kredileri bolumu (m5 icine gomulu). kredi None ise kisa davet."""
+    if not kredi:
+        return ('<div class="filtre-bolum" data-grup="all" style="margin-top:24px;">'
+                '<h3 style="font-family:\'Outfit\',sans-serif;font-size:16px;margin-bottom:8px;">'
+                '<i class="fa-solid fa-landmark" style="color:var(--accent-gold)"></i> Banka Kredileri</h3>'
+                '<p style="font-size:13px;color:var(--text-muted);">Kredi ödeme planı (amortisman tablosu) yüklerseniz '
+                '300/400/303 sınıflaması, 400→303 reclass, dönem faizi (780/660) ve dövizli kur farkı (656/646) '
+                'kontrolleri ve dönem fiş <strong>önerileri</strong> burada çıkar.</p></div>')
+    if kredi.get("hata"):
+        return ('<div class="filtre-bolum" data-grup="all" style="margin-top:24px;">'
+                '<h3 style="font-family:\'Outfit\',sans-serif;font-size:16px;margin-bottom:8px;">'
+                '<i class="fa-solid fa-landmark" style="color:var(--accent-gold)"></i> Banka Kredileri</h3>'
+                f'<p style="color:var(--accent-rose);font-size:13px;">Kredi planı okuma hatası: {kredi["hata"]}</p>'
+                f'<div style="margin-top:8px;">{_kredi_slot_yeniden()}</div></div>')
+
+    t = kredi["toplam"]
+    sat = ""
+    for k in kredi["krediler"]:
+        tip = ('<span class="badge neutral">uzun → 400/303</span>' if k["tip"] == "uzun"
+               else ('<span class="badge neutral">kısa → 300</span>' if k["tip"] == "kisa"
+                     else '<span class="badge warn">?</span>'))
+        dv = "" if k["doviz"] in ("TL", "TRY", "") else f' <span class="badge warn">{k["doviz"]}</span>'
+        sat += (f'<tr><td><strong>{k["ad"]}</strong>{dv}</td><td>{tip}</td>'
+                f'<td style="text-align:right">{_tl(k["kalan"])}</td>'
+                f'<td style="text-align:right">{_tl(k["cari"])}</td>'
+                f'<td style="text-align:right">{_tl(k["uzun"])}</td>'
+                f'<td style="text-align:right">{_tl(k["donem_faiz"])}</td></tr>')
+    tablo = (f'<div style="overflow-x:auto;"><table>'
+             f'<tr><th>Kredi</th><th>Tür</th><th>Kalan Anapara</th><th>Cari Kısım (≤12 ay)</th>'
+             f'<th>Uzun Vade (>12 ay)</th><th>Dönem Faizi</th></tr>{sat}'
+             f'<tr style="font-weight:600;"><td>TOPLAM</td><td></td>'
+             f'<td style="text-align:right">{_tl(t["kalan"])}</td>'
+             f'<td style="text-align:right">{_tl(t["cari"])}</td>'
+             f'<td style="text-align:right">{_tl(t["uzun"])}</td>'
+             f'<td style="text-align:right">{_tl(t["donem_faiz"])}</td></tr></table></div>')
+
+    oneri = ""
+    if kredi["oneriler"]:
+        li = "".join(f'<li style="margin:5px 0;color:var(--text-muted);font-size:13px;">'
+                     f'<span class="badge warn" style="margin-right:6px;">{o["hesap"]}</span>{o["ac"]}</li>'
+                     for o in kredi["oneriler"])
+        oneri = (f'<h4 style="font-family:\'Outfit\',sans-serif;font-size:14px;margin:14px 0 6px;">'
+                 f'<i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent-cyan)"></i> '
+                 f'Dönem Fiş Önerileri <span class="badge">{len(kredi["oneriler"])}</span></h4>'
+                 f'<ul style="padding-left:18px;margin:0;">{li}</ul>'
+                 f'<p style="margin-top:8px;font-size:12px;color:var(--text-muted);">Bu öneriler kontrol amaçlıdır; '
+                 f'fiş otomatik atılmaz, son onay ve kayıt sizdedir.</p>')
+    else:
+        oneri = ('<div class="notif-pill" style="margin-top:12px;"><div class="circle-icon-badge"></div>'
+                 '<span>Kredilerde dönem sonu için ek işlem (reclass/faiz/kur) gerekmiyor.</span></div>')
+
+    return (f'<div class="filtre-bolum" data-grup="all" style="margin-top:24px;">'
+            f'<h3 style="font-family:\'Outfit\',sans-serif;font-size:16px;margin-bottom:4px;">'
+            f'<i class="fa-solid fa-landmark" style="color:var(--accent-gold)"></i> Banka Kredileri '
+            f'<span class="badge {"warn" if kredi["bulgu"] else "success"}" style="margin-left:8px;">{kredi["bulgu"]} öneri</span></h3>'
+            f'<p style="margin-bottom:10px;font-size:12px;color:var(--text-muted);">Dönem sonu: {kredi["donem_sonu"]} · '
+            f'cari/uzun ayrımı bu tarihten itibaren 12 aylık pencereye göre.</p>'
+            f'{tablo}{oneri}<div style="margin-top:10px;">{_kredi_slot_yeniden()}</div></div>')
+
+
 def panel_html(sonuc):
     if not sonuc.get("hazir"):
         return _yukleme(sonuc)
+    kredi_blok = _kredi_blok(sonuc.get("kredi"))
     if sonuc.get("hata"):
-        return _baslik() + _yeniden() + f'<p style="margin-top:16px;color:var(--accent-rose);">Okuma hatası: {sonuc["hata"]}</p>'
+        return _baslik() + _yeniden() + f'<p style="margin-top:16px;color:var(--accent-rose);">Okuma hatası: {sonuc["hata"]}</p>' + kredi_blok
 
     ust = _baslik() + _yeniden()
     stat = f"""
@@ -134,7 +230,7 @@ def panel_html(sonuc):
     if sonuc["sorunlu"] == 0:
         return (ust + stat + coklu_blok +
                 '<div class="notif-pill" style="margin-top:16px;"><div class="circle-icon-badge"></div>'
-                '<span>Banka ekstresi ile defter tam eşleşti.</span></div>')
+                '<span>Banka ekstresi ile defter tam eşleşti.</span></div>' + kredi_blok)
 
     bloklar = coklu_blok
     bloklar += _liste("banka_fazla", "Kaydı Olmayan Banka Hareketleri (fiş önerisi)", "fa-triangle-exclamation", "var(--accent-rose)",
@@ -160,7 +256,7 @@ def panel_html(sonuc):
                  f'<p style="margin-top:8px;font-size:12px;color:var(--text-muted);">Fişler son aşamada önizlenip onayınızla ERP\'ye gönderilecek.</p></div>')
     else:
         oneri = ""
-    return ust + stat + bloklar + oneri
+    return ust + stat + bloklar + oneri + kredi_blok
 
 
 kaydet(Modul("m5_banka", AD, "fa-money-bill-transfer", 4, calistir, panel_html))

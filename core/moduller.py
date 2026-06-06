@@ -14,6 +14,30 @@ panel_html(sonuc) -> str                      # sonucu HTML panel olarak doner
 
 KAYIT = {}      # kod -> Modul
 
+# Faz/grup tanimlari - sol menude basliklarla gruplama icin (kapanis is akisi).
+GRUPLAR = [
+    ("veri", "Veri & Mutabakat"),
+    ("duzeltme", "Düzeltme"),
+    ("vergi", "Sonuç & Vergi"),
+]
+_GRUP_AD = dict(GRUPLAR)
+MODUL_GRUP = {
+    "m2_mizan": "veri", "m3_cari": "veri", "m5_banka": "veri",
+    "m4_gib_kdv": "veri", "m13_stok": "veri", "m12_bordro": "veri",
+    "m7_eksik": "veri",
+    "m6_fis": "duzeltme",
+    "m9_finansal": "vergi", "m10_gecici_vergi": "vergi", "m11_beyan": "vergi",
+    "m8_dosya": "vergi",
+}
+
+
+def grup_kod(kod):
+    return MODUL_GRUP.get(kod, "")
+
+
+def grup_ad(kod):
+    return _GRUP_AD.get(MODUL_GRUP.get(kod, ""), "")
+
 
 class Modul:
     def __init__(self, kod, ad, ikon, sira, calistir, panel_html):

@@ -194,4 +194,4 @@ def panel_html(sonuc):
             f'<div class="filtre-bolum" data-grup="gib">{_bolum_gib(sonuc)}</div>')
 
 
-kaydet(Modul("m7_eksik", AD, "fa-magnifying-glass", 11, calistir, panel_html))
+kaydet(Modul("m7_eksik", AD, "fa-magnifying-glass", 7, calistir, panel_html))

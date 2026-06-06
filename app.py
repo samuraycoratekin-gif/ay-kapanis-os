@@ -23,6 +23,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 from core import depo
+from core import kiraci
 from core import cari_analiz
 from core import ayarlar
 from core import moduller as M
@@ -35,54 +36,566 @@ TPL = os.path.join(HERE, "templates")
 STATIC = os.path.join(HERE, "static")
 
 # --------------------------------------------------------------------------- #
-# Giris (auth) — tek ortak parola. Parola yalniz env'de tutulur (GIRIS_PAROLASI).
-# Env yoksa (yerel calistirma) kapi kapali: sifir kurulum korunur.
-# Bulutta (Railway) env'i MUTLAKA ayarla — yoksa gercek veri korumasiz kalir.
+# Giris (auth) — cok-kiracili: her ofis/sirket kendi eposta+parolasiyla girer.
+# Parolalar kiraci.py'de pbkdf2 ile hash'li tutulur (duz parola saklanmaz).
+# Oturum token'i -> kiraci_id eslemesi process bellektedir (_OTURUMLAR).
+# GIRIS_PAROLASI env'i artik yalniz ilk varsayilan kiracinin seed parolasi.
 # --------------------------------------------------------------------------- #
 GIRIS_PAROLASI = os.environ.get("GIRIS_PAROLASI", "")
 BULUT = bool(os.environ.get("PORT"))
-_OTURUMLAR = set()                    # gecerli oturum token'lari (process bellekte)
+_OTURUMLAR = {}                       # {token: kiraci_id} — gecerli kiraci oturumlari
+
+# Platform sahibi (saglayici): tum kiracilarin ustunde, kayit defterini yonetir.
+# Kimligi env'den gelir; hicbir kiraci bu kapidan giremez. Oturum'u AYRI tutulur
+# ki kiraci veri kapsamina (depo) hic dokunmasin.
+PLATFORM_EPOSTA = os.environ.get("PLATFORM_EPOSTA", "patron@aykapanis.local")
+PLATFORM_PAROLA = os.environ.get("PLATFORM_PAROLA", "patron1234")
+_PLATFORM_OTURUMLAR = set()           # {token} — gecerli platform oturumlari
 
 
-def _auth_aktif():
-    return bool(GIRIS_PAROLASI)
+def _oturum_kiraci(handler):
+    """Istegin cerezindeki token'dan kiraci_id'yi cozer; yoksa None."""
+    ck = http.cookies.SimpleCookie(handler.headers.get("Cookie", ""))
+    t = ck.get("oturum")
+    return _OTURUMLAR.get(t.value) if t else None
+
+
+def _platform_mi(handler):
+    """Istek platform sahibi oturumuna mi ait?"""
+    ck = http.cookies.SimpleCookie(handler.headers.get("Cookie", ""))
+    t = ck.get("oturum")
+    return bool(t and t.value in _PLATFORM_OTURUMLAR)
+
+
+def _platform_dogrula(eposta, parola):
+    """Env'deki platform kimligiyle sabit-zamanli karsilastirma."""
+    e = secrets.compare_digest((eposta or "").strip().lower(), PLATFORM_EPOSTA.lower())
+    p = secrets.compare_digest((parola or ""), PLATFORM_PAROLA)
+    return e and p
 
 
 def _oturum_gecerli(handler):
-    if not _auth_aktif():
-        return True
-    ck = http.cookies.SimpleCookie(handler.headers.get("Cookie", ""))
-    t = ck.get("oturum")
-    return bool(t and t.value in _OTURUMLAR)
+    return _oturum_kiraci(handler) is not None
 
 
 def _giris_sayfa(hata=False):
-    uyari = ('<p style="color:#c0392b;margin-top:8px;">Parola hatalı, tekrar deneyin.</p>'
+    ofis_adi = ayarlar.oku().get("ofis_adi", "Ay Kapanış OS")
+    uyari = ('<div class="alert-message"><i class="fa-solid fa-circle-exclamation"></i> Şifre hatalı, tekrar deneyin.</div>'
              if hata else "")
-    return f"""<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Giriş — Ay Kapanış OS</title>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<link rel="stylesheet" href="/static/stil.css">
-</head><body><div class="container" style="max-width:420px;margin:12vh auto;">
-  <section class="panel" style="text-align:center;">
-    <h1 style="margin-bottom:6px;"><i class="fa-solid fa-lock"></i> Ay Kapanış OS</h1>
-    <p style="color:var(--text-muted);margin-bottom:18px;">Devam etmek için ofis parolasını girin.</p>
-    <form method="POST" action="/giris">
-      <input type="password" name="parola" placeholder="Ofis parolası" required autofocus
-             style="width:100%;padding:12px;border-radius:10px;border:1px solid #cbd5e1;font-size:15px;">
-      <button class="btn" type="submit" style="width:100%;margin-top:12px;">
-        <i class="fa-solid fa-right-to-bracket"></i> Giriş</button>
-    </form>{uyari}
-  </section>
-  <footer style="text-align:center;"><p>Ay Kapanış OS &copy; 2026</p></footer>
-</div></body></html>"""
+    return f"""<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Giriş — {ofis_adi}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {{
+      --bg-dark: #0e1d3d;
+      --bg-card: rgba(23, 37, 68, 0.55);
+      --border-card: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #14b8a6;
+      --accent-rose: #f43f5e;
+      --accent-emerald: #10b981;
+      --accent-gold: #f59e0b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }}
+    
+    * {{
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }}
+    
+    body {{
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      overflow-x: hidden;
+      position: relative;
+    }}
+    
+    .glow-orb {{
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(100px);
+      z-index: 0;
+      opacity: 0.20;
+      animation: float 20s infinite alternate ease-in-out;
+    }}
+    .orb-1 {{
+      width: 400px;
+      height: 400px;
+      background: var(--accent-cyan);
+      top: -100px;
+      left: -100px;
+    }}
+    .orb-2 {{
+      width: 500px;
+      height: 500px;
+      background: #6366f1;
+      bottom: -150px;
+      right: -150px;
+      animation-delay: -5s;
+    }}
+    
+    @keyframes float {{
+      0% {{ transform: translate(0, 0) scale(1); }}
+      100% {{ transform: translate(80px, 50px) scale(1.1); }}
+    }}
+    
+    .login-container {{
+      width: 100%;
+      max-width: 440px;
+      padding: 24px;
+      z-index: 10;
+      position: relative;
+    }}
+    
+    .brand-section {{
+      text-align: center;
+      margin-bottom: 24px;
+    }}
+    .brand-logo {{
+      font-family: 'Outfit', sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #fff 30%, var(--accent-cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }}
+    .brand-logo i {{
+      -webkit-text-fill-color: var(--accent-cyan);
+    }}
+    .brand-subtitle {{
+      font-size: 14px;
+      color: var(--text-muted);
+    }}
+    
+    .login-card {{
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-card);
+      border-radius: 20px;
+      padding: 32px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      margin-bottom: 24px;
+    }}
+    
+    .input-group {{
+      margin-bottom: 20px;
+      position: relative;
+    }}
+    
+    .input-label {{
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      font-family: 'Outfit', sans-serif;
+    }}
+    
+    .input-wrapper {{
+      position: relative;
+      display: flex;
+      align-items: center;
+      width: 100%;
+    }}
+    
+    .input-field {{
+      width: 100%;
+      padding: 12px 40px 12px 14px;
+      background: rgba(7, 10, 19, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 15px;
+      transition: all 0.3s ease;
+    }}
+    .input-field:focus {{
+      outline: none;
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 12px rgba(20, 184, 166, 0.25);
+    }}
+    
+    select.input-field {{
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      background-size: 16px;
+      cursor: pointer;
+    }}
+    select.input-field option {{
+      background: #0f172a;
+      color: var(--text-main);
+    }}
+    
+    .eye-toggle {{
+      position: absolute;
+      right: 14px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 14px;
+      transition: color 0.2s ease;
+    }}
+    .eye-toggle:hover {{
+      color: var(--text-main);
+    }}
+    
+    .remember-me {{
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+      cursor: pointer;
+      margin-bottom: 24px;
+      user-select: none;
+    }}
+    .remember-me input {{
+      accent-color: var(--accent-cyan);
+      cursor: pointer;
+    }}
+    
+    .submit-btn {{
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, var(--accent-cyan), #0d9488);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }}
+    .submit-btn:hover {{
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(20, 184, 166, 0.3);
+    }}
+    .submit-btn:active {{
+      transform: translateY(1px);
+    }}
+    
+    .spinner {{
+      display: none;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 0.8s linear infinite;
+    }}
+    @keyframes spin {{
+      to {{ transform: rotate(360deg); }}
+    }}
+    
+    .alert-message {{
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      color: #fda4af;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-top: 16px;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }}
+    
+    .features-section {{
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 8px;
+    }}
+    .feature-card {{
+      background: rgba(15, 23, 42, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 12px;
+      padding: 12px 8px;
+      text-align: center;
+      transition: all 0.3s ease;
+    }}
+    .feature-card:hover {{
+      background: rgba(15, 23, 42, 0.45);
+      border-color: rgba(20, 184, 166, 0.15);
+    }}
+    .feature-card i {{
+      font-size: 16px;
+      margin-bottom: 6px;
+      display: block;
+    }}
+    .feature-card i.cyan {{ color: var(--accent-cyan); }}
+    .feature-card i.emerald {{ color: var(--accent-emerald); }}
+    .feature-card i.gold {{ color: var(--accent-gold); }}
+    
+    .feature-card h4 {{
+      font-family: 'Outfit', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }}
+    .feature-card p {{
+      font-size: 9px;
+      color: var(--text-muted);
+      line-height: 1.2;
+    }}
+    
+    footer {{
+      text-align: center;
+      margin-top: 24px;
+      font-size: 11px;
+      color: var(--text-muted);
+      opacity: 0.7;
+    }}
+  </style>
+</head>
+<body>
+  <div class="glow-orb orb-1"></div>
+  <div class="glow-orb orb-2"></div>
+  
+  <div class="login-container">
+    <div class="brand-section">
+      <div class="brand-logo"><i class="fa-solid fa-compass-drafting"></i> {ofis_adi}</div>
+      <div class="brand-subtitle">Dönem Kapanış Otomasyon Portalı</div>
+    </div>
+    
+    <div class="login-card">
+      <form id="login-form" method="POST" action="/giris">
+        <div class="input-group">
+          <label class="input-label" for="eposta">E-posta</label>
+          <div class="input-wrapper">
+            <input class="input-field" type="email" id="eposta" name="eposta" placeholder="ofis@firma.com" autocomplete="username" required>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label class="input-label" for="parola">Şifre</label>
+          <div class="input-wrapper">
+            <input class="input-field" type="password" id="parola" name="parola" placeholder="Ofis/şirket şifreniz" autocomplete="current-password" required>
+            <i class="fa-solid fa-eye eye-toggle" id="toggle-password" title="Şifreyi Göster/Gizle"></i>
+          </div>
+        </div>
+        
+        <label class="remember-me">
+          <input type="checkbox" name="beni_hatirla" checked>
+          Beni Hatırla (30 gün)
+        </label>
+        
+        <button class="submit-btn" type="submit" id="submit-btn">
+          <span class="spinner" id="btn-spinner"></span>
+          <span id="btn-text">Sisteme Giriş Yap</span>
+        </button>
+      </form>
+      
+      {uyari}
+    </div>
+    
+    <div class="features-section">
+      <div class="feature-card">
+        <i class="fa-solid fa-heart-pulse cyan"></i>
+        <h4>13 Denetim</h4>
+        <p>Hatalı bakiye ve vergi uyumsuzluk analizi</p>
+      </div>
+      <div class="feature-card">
+        <i class="fa-solid fa-cloud-arrow-down emerald"></i>
+        <h4>Luca API</h4>
+        <p>Mizan ve fişlerin doğrudan entegrasyonu</p>
+      </div>
+      <div class="feature-card">
+        <i class="fa-solid fa-shield-halved gold"></i>
+        <h4>Güvenli Sunucu</h4>
+        <p>Kilit mekanizması ve rol bazlı onay</p>
+      </div>
+    </div>
+    
+    <footer>
+      <p>{ofis_adi} &copy; 2026 · veri güvenliği protokolleriyle korunmaktadır</p>
+    </footer>
+  </div>
+  
+  <script>
+    const passInput = document.getElementById('parola');
+    const togglePass = document.getElementById('toggle-password');
+    const form = document.getElementById('login-form');
+    const btn = document.getElementById('submit-btn');
+    const spinner = document.getElementById('btn-spinner');
+    const btnText = document.getElementById('btn-text');
+
+    togglePass.addEventListener('click', () => {{
+      const type = passInput.getAttribute('type') === 'password' ? 'text' : 'password';
+      passInput.setAttribute('type', type);
+      togglePass.classList.toggle('fa-eye');
+      togglePass.classList.toggle('fa-eye-slash');
+    }});
+    
+    form.addEventListener('submit', () => {{
+      btn.disabled = true;
+      btn.style.opacity = '0.8';
+      btn.style.cursor = 'not-allowed';
+      spinner.style.display = 'inline-block';
+      btnText.innerText = 'Bağlanıyor...';
+    }});
+  </script>
+</body>
+</html>"""
 
 
 # --------------------------------------------------------------------------- #
 # API fonksiyonlari (hepsi JSON/dict dondurur)
 # --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# Platform yonetimi - kiraci (ofis/sirket) kayit defteri arayuzu.
+# Yalnizca platform sahibi oturumu erisir (do_GET/do_POST'ta _platform_mi gate).
+# --------------------------------------------------------------------------- #
+def api_kiracilar():
+    """Tum kiracilarin ozeti (parola_hash gizli)."""
+    out = []
+    for k in kiraci.kiracilari_getir():
+        tip = k.get("tip", "ofis")
+        out.append({
+            "id": k["id"], "unvan": k.get("unvan", ""),
+            "tip": tip, "tip_ad": kiraci.TIPLER.get(tip, tip),
+            "eposta": k.get("eposta", ""), "paket": k.get("paket", ""),
+            "aktif": bool(k.get("aktif", True)), "olusturma": k.get("olusturma", ""),
+        })
+    return {"kiracilar": out, "tipler": kiraci.TIPLER}
+
+
+def api_kiraci_ekle(body):
+    """Yeni kiraci (ofis/sirket) olusturur + giris kimligi tanimlar."""
+    unvan = (body.get("unvan") or "").strip()
+    eposta = (body.get("eposta") or "").strip()
+    parola = (body.get("parola") or "").strip()
+    tip = body.get("tip") or "ofis"
+    paket = (body.get("paket") or "pilot").strip() or "pilot"
+    if not unvan:
+        return {"hata": "Ünvan zorunlu."}
+    if len(parola) < 4:
+        return {"hata": "Parola en az 4 karakter olmalı."}
+    try:
+        k = kiraci.kiraci_ekle(unvan, eposta, parola, tip=tip, paket=paket)
+    except ValueError as e:
+        return {"hata": str(e)}
+    return {"ok": True, "kiraci": {"id": k["id"], "unvan": k["unvan"],
+                                   "eposta": k["eposta"], "tip": k["tip"]}}
+
+
+def api_kiraci_durum(body):
+    """Kiraciyi aktif/pasif yapar (pasif kiraci giris yapamaz)."""
+    k = kiraci.kiraci_durum_ayarla(body.get("id"), bool(body.get("aktif")))
+    if not k:
+        return {"hata": "Kiracı bulunamadı."}
+    return {"ok": True, "aktif": k["aktif"]}
+
+
+def api_kiraci_parola(body):
+    """Kiraci giris parolasini sifirlar."""
+    yeni = (body.get("parola") or "").strip()
+    if len(yeni) < 4:
+        return {"hata": "Parola en az 4 karakter olmalı."}
+    k = kiraci.kiraci_parola_guncelle(body.get("id"), yeni)
+    if not k:
+        return {"hata": "Kiracı bulunamadı."}
+    return {"ok": True}
+
+
+# --------------------------------------------------------------------------- #
+# Kurulum (onboarding) - yeni kiracinin ilk girisinde calisir.
+# Desteklenen ERP'ler ve onerilen baglama yontemi. Gercek konektorler (Parasut
+# OAuth vb.) ayri asamada gelir; suan "dosya" ile herkes hemen baslayabilir.
+# --------------------------------------------------------------------------- #
+ERP_SECENEKLERI = {
+    "parasut": {"ad": "Paraşüt", "yontem": "oauth"},
+    "logo":    {"ad": "Logo (Tiger / GO)", "yontem": "oauth"},
+    "mikro":   {"ad": "Mikro", "yontem": "oauth"},
+    "netsis":  {"ad": "Netsis", "yontem": "oauth"},
+    "luca":    {"ad": "Luca", "yontem": "dosya"},
+    "dosya":   {"ad": "Dosya Yükleme (Excel / CSV)", "yontem": "dosya"},
+}
+# Baglama yontemi insan-okunur aciklamasi (sihirbazda gosterilir).
+BAGLANTI_ACIKLAMA = {
+    "oauth": "API/OAuth bağlantısı yakında. Şifreniz bizde saklanmaz; "
+             "şimdilik mizan/dosya yükleyerek hemen başlayabilirsiniz.",
+    "anahtar": "ERP panelinizden ürettiğiniz API anahtarını yapıştırırsınız; "
+               "anahtar şifreli saklanır, asıl parolanız bizde tutulmaz.",
+    "dosya": "Mizan/Excel/CSV dosyalarını yükleyerek çalışırsınız — en hızlı "
+             "ve en güvenli başlangıç, ek bağlantı gerekmez.",
+}
+
+
+def _kurulum_gerekli():
+    """Aktif kiracida hic personel yoksa kurulum sihirbazi gerekir.
+    (varsayilan/eski kiracilar zaten kullaniciya sahip oldugundan muaf.)"""
+    return not depo.kullanicilari_getir()
+
+
+def api_kurulum_bilgi():
+    """Sihirbaz icin kiraci bilgisi + ERP secenekleri."""
+    k = kiraci.kiraci_getir(depo.aktif_kiraci()) or {}
+    tip = k.get("tip", "ofis")
+    return {
+        "tip": tip,
+        "tip_ad": kiraci.TIPLER.get(tip, "Ofis"),
+        "unvan": k.get("unvan", ""),
+        "erp_secenekleri": [{"kod": kk, "ad": v["ad"], "yontem": v["yontem"]}
+                            for kk, v in ERP_SECENEKLERI.items()],
+        "baglanti_aciklama": BAGLANTI_ACIKLAMA,
+    }
+
+
+def api_kurulum(body):
+    """Yeni kiracinin tek-seferlik kurulumu: ofis adi + yonetici + ERP secimi.
+    Yalniz henuz hic kullanici yokken calisir (tekrar calismaz)."""
+    if depo.kullanicilari_getir():
+        return {"hata": "Kurulum zaten tamamlanmış."}
+    ofis_adi = (body.get("ofis_adi") or "").strip()
+    yonetici_ad = (body.get("yonetici_ad") or "").strip()
+    erp = body.get("erp_tipi") or "dosya"
+    if not yonetici_ad:
+        return {"hata": "Yönetici adı zorunlu."}
+    if erp not in ERP_SECENEKLERI:
+        erp = "dosya"
+    # Ilk yoneticiyi ac ve aktif kullanici yap.
+    k = depo.kullanici_ekle(yonetici_ad, "yonetici")
+    depo.aktif_kullanici_ayarla(k["id"])
+    # Kiraci-izole ayarlara kurulum bilgisini yaz.
+    yeni = dict(ayarlar.oku())
+    yeni["ofis_adi"] = ofis_adi or yeni.get("ofis_adi", "Ay Kapanış OS")
+    yeni["erp_tipi"] = erp
+    yeni["erp_baglanti"] = ERP_SECENEKLERI[erp]["yontem"]
+    yeni["kurulum_tamam"] = True
+    ayarlar.yaz(yeni)
+    return {"ok": True}
+
+
 def api_ofis(donem=None):
     """Ofis panosu: tum musteriler + secili donem ozetleri."""
     donem = donem or AKTIF_DONEM
@@ -101,7 +614,8 @@ def api_kokpit(musteri_id, donem):
     if not m:
         return {"hata": "Musteri bulunamadi."}
     durum = depo.donem_getir(musteri_id, donem, M.kodlar())
-    moduller = [{"kod": x.kod, "ad": x.ad, "ikon": x.ikon} for x in M.liste()]
+    moduller = [{"kod": x.kod, "ad": x.ad, "ikon": x.ikon,
+                 "grup": M.grup_kod(x.kod), "grup_ad": M.grup_ad(x.kod)} for x in M.liste()]
     return {"musteri": m, "donem": donem, "donemler": DONEMLER, "durum": durum, "moduller": moduller,
             "kilitli": bool(durum.get("kilitli")),
             "kilit_kullanici": durum.get("kilit_kullanici", ""),
@@ -113,11 +627,46 @@ def api_kullanicilar():
             "aktif": depo.aktif_kullanici(), "roller": depo.ROLLER}
 
 
+def api_kullanici_listesi():
+    return {"kullanicilar": [{"id": k["id"], "ad": k["ad"]} for k in depo.kullanicilari_getir()]}
+
+
 def api_aktif_kullanici(body):
     k = depo.aktif_kullanici_ayarla(body.get("id"))
     if not k:
         return {"hata": "Kullanıcı bulunamadı."}
     return {"ok": True, "aktif": k}
+
+
+def api_kullanici_ekle(body):
+    """Kiraci icine yeni personel ekler. Yalniz Ofis Yoneticisi."""
+    if not depo.yonetici_mi():
+        return {"hata": "Kullanıcı ekleme yetkisi yalnızca Ofis Yöneticisinde."}
+    ad = (body.get("ad") or "").strip()
+    rol = body.get("rol") or "eleman"
+    if not ad:
+        return {"hata": "Ad zorunlu."}
+    if rol not in depo.ROLLER:
+        return {"hata": "Geçersiz rol."}
+    k = depo.kullanici_ekle(ad, rol)
+    return {"ok": True, "kullanici": k}
+
+
+def api_kullanici_rol(body):
+    """Personelin rolunu degistirir. Yalniz Ofis Yoneticisi."""
+    if not depo.yonetici_mi():
+        return {"hata": "Rol değiştirme yetkisi yalnızca Ofis Yöneticisinde."}
+    k = depo.kullanici_rol_guncelle(body.get("id"), body.get("rol"))
+    if not k:
+        return {"hata": "Kullanıcı bulunamadı veya geçersiz rol."}
+    return {"ok": True, "kullanici": k}
+
+
+def api_kullanici_sil(body):
+    """Personeli siler. Yalniz Ofis Yoneticisi; son yonetici silinemez."""
+    if not depo.yonetici_mi():
+        return {"hata": "Kullanıcı silme yetkisi yalnızca Ofis Yöneticisinde."}
+    return depo.kullanici_sil(body.get("id"))
 
 
 def api_donem_kilit(body):
@@ -430,6 +979,27 @@ def api_fis_islem(body):
     return {"ok": True, "html": mod.panel_html(sonuc) if mod else ""}
 
 
+def api_gecici_vergi(body):
+    """Musavirin girdigi KKEG tutarlari + indirim/mahsup parametrelerini saklar,
+    gecici vergi modulunu yeniden calistirip yeni paneli doner.
+    KKEG aday + musavir ONAY modeli: tutarlari musavir girer; motor fis ATMAZ."""
+    musteri_id = body.get("m"); donem = body.get("d")
+    if depo.donem_kilitli_mi(musteri_id, donem):
+        return {"hata": "Dönem kilitli — geçici vergi girişi yapılamaz."}
+    ALANLAR = ("kkeg_gvk40", "kkeg_kvk11", "kkeg_fgk", "kkeg_diger",
+               "istisna", "gecmis_zarar", "onceki_hesaplanan", "pesin_odenen")
+    veri = {}
+    for a in ALANLAR:
+        veri[a] = _sayi(body.get(a), 0.0)
+    bm = body.get("beyan_matrah")
+    veri["beyan_matrah"] = "" if bm in ("", None) else _sayi(bm, 0.0)
+    k = depo.aktif_kullanici()
+    depo.gecici_vergi_yaz(musteri_id, donem, veri, k["ad"] if k else "")
+    mod = M.getir("m10_gecici_vergi")
+    sonuc = mod.calistir(musteri_id, donem) if mod else {}
+    return {"ok": True, "html": mod.panel_html(sonuc) if mod else ""}
+
+
 def api_mutabakat_modu(body):
     """Musterinin Akilli Mutabakat sahipligini ac/kapat; modulu yeniden calistirir."""
     musteri_id = body.get("m"); donem = body.get("d")
@@ -494,15 +1064,39 @@ class Handler(BaseHTTPRequestHandler):
                 ck = http.cookies.SimpleCookie(self.headers.get("Cookie", ""))
                 t = ck.get("oturum")
                 if t:
-                    _OTURUMLAR.discard(t.value)
+                    _OTURUMLAR.pop(t.value, None)
+                    _PLATFORM_OTURUMLAR.discard(t.value)
                 return self._yonlendir("/giris")
-            if not p.startswith("/static/") and not _oturum_gecerli(self):
-                if p.startswith("/api/"):
-                    return self._gonder({"hata": "Oturum gerekli.", "giris": True}, code=401)
-                return self._yonlendir("/giris")
+            # --- Platform kapisi: kiraci-disi; kiraci gate'inden ONCE ele alinir ---
+            if p == "/yonetim" or p.startswith("/api/kiraci"):
+                if not _platform_mi(self):
+                    if p.startswith("/api/"):
+                        return self._gonder({"hata": "Platform yetkisi gerekli.", "giris": True}, code=401)
+                    return self._yonlendir("/giris")
+                if p == "/yonetim":
+                    return self._gonder(_dosya_oku(os.path.join(TPL, "yonetim.html")),
+                                        "text/html; charset=utf-8")
+                if p == "/api/kiracilar":
+                    return self._gonder(api_kiracilar())
+                return self._gonder({"hata": "bulunamadi"}, code=404)
+            if not p.startswith("/static/"):
+                kid = _oturum_kiraci(self)
+                if kid is None:
+                    if p.startswith("/api/"):
+                        return self._gonder({"hata": "Oturum gerekli.", "giris": True}, code=401)
+                    # Platform oturumu kiraci sayfasina geldiyse yonetime don.
+                    return self._yonlendir("/yonetim" if _platform_mi(self) else "/giris")
+                depo.kiraci_ayarla(kid)     # bu istegin tum veri erisimi bu kiraciya kapsanir
 
             if p in ("/", "/index.html"):
+                if _kurulum_gerekli():
+                    return self._yonlendir("/kurulum")
                 return self._gonder(_dosya_oku(os.path.join(TPL, "ofis_panosu.html")),
+                                    "text/html; charset=utf-8")
+            if p == "/kurulum":
+                if not _kurulum_gerekli():
+                    return self._yonlendir("/")
+                return self._gonder(_dosya_oku(os.path.join(TPL, "kurulum.html")),
                                     "text/html; charset=utf-8")
             if p in ("/kokpit", "/kokpit.html"):
                 return self._gonder(_dosya_oku(os.path.join(TPL, "kapanis_kokpit.html")),
@@ -536,8 +1130,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self._gonder(api_ofis((q.get("d") or [None])[0]))
             if p == "/api/kokpit":
                 return self._gonder(api_kokpit((q.get("m") or [""])[0], (q.get("d") or [""])[0]))
+            if p == "/api/kullanici_listesi":
+                return self._gonder(api_kullanici_listesi())
             if p == "/api/kullanicilar":
                 return self._gonder(api_kullanicilar())
+            if p == "/api/kurulum_bilgi":
+                return self._gonder(api_kurulum_bilgi())
             if p == "/api/ayarlar":
                 return self._gonder(api_ayarlar_oku())
             if p == "/api/modul":
@@ -555,16 +1153,43 @@ class Handler(BaseHTTPRequestHandler):
         ham = self.rfile.read(n)
         # --- Giris formu (urlencoded), JSON'dan ONCE ele alinir ---
         if p == "/giris":
-            parola = (parse_qs(ham.decode("utf-8", "replace")).get("parola") or [""])[0]
-            if _auth_aktif() and secrets.compare_digest(parola, GIRIS_PAROLASI):
+            params = parse_qs(ham.decode("utf-8", "replace"))
+            eposta = (params.get("eposta") or [""])[0]
+            parola = (params.get("parola") or [""])[0]
+            # Once platform sahibi kimligi denenir; degilse kiraci girisi.
+            if _platform_dogrula(eposta, parola):
                 t = secrets.token_urlsafe(32)
-                _OTURUMLAR.add(t)
+                _PLATFORM_OTURUMLAR.add(t)
+                return self._oturum_kur(t, "/yonetim")
+            k = kiraci.dogrula(eposta, parola)
+            if k:
+                t = secrets.token_urlsafe(32)
+                _OTURUMLAR[t] = k["id"]
                 return self._oturum_kur(t, "/")
             return self._yonlendir("/giris?hata=1")
-        if not _oturum_gecerli(self):
-            return self._gonder({"hata": "Oturum gerekli.", "giris": True}, code=401)
         body = json.loads(ham or b"{}")
+        # --- Platform yonetim POST'lari: kiraci gate'inden ONCE ---
+        if p.startswith("/api/kiraci"):
+            if not _platform_mi(self):
+                return self._gonder({"hata": "Platform yetkisi gerekli.", "giris": True}, code=401)
+            try:
+                if p == "/api/kiraci_ekle":
+                    return self._gonder(api_kiraci_ekle(body))
+                if p == "/api/kiraci_durum":
+                    return self._gonder(api_kiraci_durum(body))
+                if p == "/api/kiraci_parola":
+                    return self._gonder(api_kiraci_parola(body))
+            except Exception as e:
+                _hata_logla(f"POST {p}", e)
+                return self._gonder({"hata": str(e)}, code=500)
+            return self._gonder({"hata": "bulunamadi"}, code=404)
+        kid = _oturum_kiraci(self)
+        if kid is None:
+            return self._gonder({"hata": "Oturum gerekli.", "giris": True}, code=401)
+        depo.kiraci_ayarla(kid)             # bu istegin tum veri erisimi bu kiraciya kapsanir
         try:
+            if p == "/api/kurulum":
+                return self._gonder(api_kurulum(body))
             if p == "/api/musteri_ekle":
                 return self._gonder(api_musteri_ekle(body))
             if p == "/api/yukle":
@@ -573,8 +1198,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._gonder(api_mutabakat_modu(body))
             if p == "/api/fis_islem":
                 return self._gonder(api_fis_islem(body))
+            if p == "/api/gecici_vergi":
+                return self._gonder(api_gecici_vergi(body))
             if p == "/api/aktif_kullanici":
                 return self._gonder(api_aktif_kullanici(body))
+            if p == "/api/kullanici_ekle":
+                return self._gonder(api_kullanici_ekle(body))
+            if p == "/api/kullanici_rol":
+                return self._gonder(api_kullanici_rol(body))
+            if p == "/api/kullanici_sil":
+                return self._gonder(api_kullanici_sil(body))
             if p == "/api/donem_kilit":
                 return self._gonder(api_donem_kilit(body))
             if p == "/api/ayarlar":
@@ -595,6 +1228,11 @@ def main(port=None):
     srv = ThreadingHTTPServer((host, port), Handler)
     url = f"http://localhost:{port}"
     print(f"Ay Kapanis OS calisiyor:  {host}:{port}", flush=True)
+    vk = kiraci.kiraci_getir("varsayilan")
+    if vk:
+        print(f"Varsayilan giris      :  {vk['eposta']}  /  {GIRIS_PAROLASI or '1234'}", flush=True)
+    print(f"Platform yonetim giris:  {PLATFORM_EPOSTA}  /  {PLATFORM_PAROLA}   ->  /yonetim", flush=True)
+    print(f"Kayitli kiraci sayisi :  {len(kiraci.kiracilari_getir())}", flush=True)
     print("Kapatmak icin Ctrl+C.", flush=True)
     if not bulut:                       # tarayiciyi yalniz yerelde ac
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
@@ -608,9 +1246,28 @@ def main(port=None):
 # --------------------------------------------------------------------------- #
 # Demo/seed verisi (ilk calistirmada ornek musteriler olusturur)
 # --------------------------------------------------------------------------- #
+def _varsayilan_kiraci_seed():
+    """Hicbir kiraci yoksa giris yapilabilsin diye 'varsayilan' kiraciyi olusturur.
+    Eposta: VARSAYILAN_EPOSTA env'i (yoksa ofis@aykapanis.local).
+    Parola: GIRIS_PAROLASI env'i (yoksa 1234)."""
+    if kiraci.kiraci_getir("varsayilan"):
+        return
+    eposta = os.environ.get("VARSAYILAN_EPOSTA", "ofis@aykapanis.local")
+    parola = GIRIS_PAROLASI or "1234"
+    kayitlar = kiraci.kiracilari_getir()
+    kayitlar.append({
+        "id": "varsayilan", "unvan": "Varsayılan Ofis", "tip": "ofis",
+        "eposta": eposta, "parola_hash": kiraci._hash_parola(parola),
+        "paket": "pilot", "aktif": True,
+        "olusturma": datetime.now().strftime("%Y-%m-%d"),
+    })
+    depo._yaz(kiraci.KIRACILAR_JSON, kayitlar)
+
+
 def seed():
+    _varsayilan_kiraci_seed()
     if not depo.kullanicilari_getir():
-        depo.kullanici_ekle("Ayşe Yılmaz (Müdür)", "mudur")
+        depo.kullanici_ekle("Ayşe Yılmaz (Yönetici)", "yonetici")
         depo.kullanici_ekle("Mehmet Demir", "eleman")
     if depo.musterileri_getir():
         return

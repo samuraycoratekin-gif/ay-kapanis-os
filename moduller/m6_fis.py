@@ -206,4 +206,4 @@ def panel_html(sonuc):
     return ust + stat + kartlar + _bekleyen_veri(sonuc.get("slotlar"))
 
 
-kaydet(Modul("m6_fis", AD, "fa-stamp", 9, calistir, panel_html))
+kaydet(Modul("m6_fis", AD, "fa-stamp", 8, calistir, panel_html))

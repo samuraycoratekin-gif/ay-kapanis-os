@@ -14,12 +14,43 @@ from datetime import datetime
 HERE = os.path.dirname(os.path.abspath(__file__))      # .../Ay_Kapanis_OS/core
 ROOT = os.path.dirname(HERE)                            # .../Ay_Kapanis_OS
 # Railway/bulut: kalici disk (Volume) VERI_DIR ile verilir; yoksa yerel veri/.
-VERI = os.environ.get("VERI_DIR") or os.path.join(ROOT, "veri")
-MUSTERILER_JSON = os.path.join(VERI, "musteriler.json")
-KULLANICILAR_JSON = os.path.join(VERI, "kullanicilar.json")
-AKTIF_JSON = os.path.join(VERI, "aktif_kullanici.json")
+ROOT_VERI = os.environ.get("VERI_DIR") or os.path.join(ROOT, "veri")
+VERI = ROOT_VERI            # geriye donuk ad; kiraci-disi (registry) erisimi icin kok
 
-os.makedirs(VERI, exist_ok=True)
+os.makedirs(ROOT_VERI, exist_ok=True)
+
+# --------------------------------------------------------------------------- #
+# Cok-kiracililik (multi-tenant): aktif kiraci istek basina thread-local'da.
+# Tum musteri/kullanici/donem verisi  veri/kiracilar/{kiraci_id}/  altinda izole.
+# Kiraci ayarlanmamissa "varsayilan" kiraciya duser (tek-kiracili/gocten once uyum).
+# --------------------------------------------------------------------------- #
+_CTX = threading.local()
+
+
+def kiraci_ayarla(kiraci_id):
+    """Istek baslangicinda cagrilir; bu thread'in sonraki tum depo erisimlerini kapsar."""
+    _CTX.kiraci = kiraci_id or "varsayilan"
+
+
+def aktif_kiraci():
+    return getattr(_CTX, "kiraci", None) or "varsayilan"
+
+
+def _kveri():
+    """Aktif kiracinin veri kok dizini."""
+    return os.path.join(ROOT_VERI, "kiracilar", aktif_kiraci())
+
+
+def _musteriler_json():
+    return os.path.join(_kveri(), "musteriler.json")
+
+
+def _kullanicilar_json():
+    return os.path.join(_kveri(), "kullanicilar.json")
+
+
+def _aktif_json():
+    return os.path.join(_kveri(), "aktif_kullanici.json")
 
 
 # --------------------------------------------------------------------------- #
@@ -48,7 +79,7 @@ def _yaz(yol, obj):
 
 
 def _donem_dizin(musteri_id, donem):
-    return os.path.join(VERI, "musteriler", musteri_id, donem)
+    return os.path.join(_kveri(), "musteriler", musteri_id, donem)
 
 
 def yuklenen_dizin(musteri_id, donem):
@@ -85,7 +116,7 @@ def yuklenen_bul(musteri_id, donem, modul_kod, rol=None):
 # Musteri portfoyu
 # --------------------------------------------------------------------------- #
 def musterileri_getir():
-    return _oku(MUSTERILER_JSON, [])
+    return _oku(_musteriler_json(), [])
 
 
 def musteri_getir(musteri_id):
@@ -103,7 +134,7 @@ def musteri_ekle(unvan, vergi_no="", erp_tipi="Dosya Yükleme"):
              "akilli_mutabakat": False,
              "olusturma": datetime.now().strftime("%Y-%m-%d")}
     musteriler.append(kayit)
-    _yaz(MUSTERILER_JSON, musteriler)
+    _yaz(_musteriler_json(), musteriler)
     return kayit
 
 
@@ -112,20 +143,29 @@ def musteri_guncelle(musteri_id, **alanlar):
     for m in musteriler:
         if m["id"] == musteri_id:
             m.update(alanlar)
-            _yaz(MUSTERILER_JSON, musteriler)
+            _yaz(_musteriler_json(), musteriler)
             return m
     return None
 
 
 # --------------------------------------------------------------------------- #
-# Kullanicilar + roller (yerel; parolasiz aktif kullanici secimi)
-# Roller: "mudur" -> onay/gonder/kilit yetkisi; "eleman" -> sadece taslak uretir.
+# Kullanicilar + roller (kiraci icindeki personel; aktif kullanici secimi)
+# Roller (yetki azalan sirada):
+#   "yonetici" -> Ofis Yoneticisi: kullanici/ayar yonetimi + onay/kilit (sirket admini)
+#   "mudur"    -> Muhasebe Muduru: onay/gonder/kilit
+#   "eleman"   -> Muhasebe Elemani: sadece taslak uretir
 # --------------------------------------------------------------------------- #
-ROLLER = {"mudur": "Muhasebe Müdürü", "eleman": "Muhasebe Elemanı"}
+ROLLER = {
+    "yonetici": "Ofis Yöneticisi",
+    "mudur": "Muhasebe Müdürü",
+    "eleman": "Muhasebe Elemanı",
+}
+# onay/kilit yetkisi olan roller
+_YETKILI_ROLLER = {"yonetici", "mudur"}
 
 
 def kullanicilari_getir():
-    return _oku(KULLANICILAR_JSON, [])
+    return _oku(_kullanicilar_json(), [])
 
 
 def kullanici_getir(kullanici_id):
@@ -137,16 +177,48 @@ def kullanici_getir(kullanici_id):
 
 def kullanici_ekle(ad, rol="eleman"):
     kullanicilar = kullanicilari_getir()
-    yeni_id = "K" + str(len(kullanicilar) + 1).zfill(3)
+    # Cakismayan id: mevcut en buyuk numaranin bir fazlasi (silme sonrasi guvenli)
+    mevcut = [int(k["id"][1:]) for k in kullanicilar if k["id"][1:].isdigit()]
+    yeni_id = "K" + str((max(mevcut) + 1) if mevcut else 1).zfill(3)
     kayit = {"id": yeni_id, "ad": ad, "rol": rol if rol in ROLLER else "eleman"}
     kullanicilar.append(kayit)
-    _yaz(KULLANICILAR_JSON, kullanicilar)
+    _yaz(_kullanicilar_json(), kullanicilar)
     return kayit
+
+
+def kullanici_rol_guncelle(kullanici_id, rol):
+    if rol not in ROLLER:
+        return None
+    kullanicilar = kullanicilari_getir()
+    for k in kullanicilar:
+        if k["id"] == kullanici_id:
+            k["rol"] = rol
+            _yaz(_kullanicilar_json(), kullanicilar)
+            return k
+    return None
+
+
+def kullanici_sil(kullanici_id):
+    """Kullaniciyi siler. Son yoneticiyi silmeyi engeller (kilitlenme onlemi)."""
+    kullanicilar = kullanicilari_getir()
+    hedef = next((k for k in kullanicilar if k["id"] == kullanici_id), None)
+    if not hedef:
+        return {"hata": "Kullanıcı bulunamadı."}
+    if hedef.get("rol") == "yonetici":
+        yonetici_sayisi = sum(1 for k in kullanicilar if k.get("rol") == "yonetici")
+        if yonetici_sayisi <= 1:
+            return {"hata": "Son Ofis Yöneticisi silinemez."}
+    kalan = [k for k in kullanicilar if k["id"] != kullanici_id]
+    _yaz(_kullanicilar_json(), kalan)
+    # Aktif kullanici silindiyse ilk kullaniciya dus
+    if _oku(_aktif_json(), {}).get("id") == kullanici_id:
+        _yaz(_aktif_json(), {"id": kalan[0]["id"]} if kalan else {})
+    return {"ok": True}
 
 
 def aktif_kullanici():
     """Secili aktif kullaniciyi doner; yoksa ilk kullaniciya duser."""
-    kid = _oku(AKTIF_JSON, {}).get("id")
+    kid = _oku(_aktif_json(), {}).get("id")
     k = kullanici_getir(kid) if kid else None
     if k:
         return k
@@ -157,14 +229,21 @@ def aktif_kullanici():
 def aktif_kullanici_ayarla(kullanici_id):
     if not kullanici_getir(kullanici_id):
         return None
-    _yaz(AKTIF_JSON, {"id": kullanici_id})
+    _yaz(_aktif_json(), {"id": kullanici_id})
     return aktif_kullanici()
 
 
 def yetkili_mi(islem="onay"):
-    """islem 'onay'/'kilit' icin aktif kullanicinin mudur olup olmadigini doner."""
+    """islem 'onay'/'kilit' icin aktif kullanicinin yetkili (yonetici/mudur) olup
+    olmadigini doner."""
     k = aktif_kullanici()
-    return bool(k and k.get("rol") == "mudur")
+    return bool(k and k.get("rol") in _YETKILI_ROLLER)
+
+
+def yonetici_mi():
+    """Aktif kullanici Ofis Yoneticisi mi (kullanici/ayar yonetimi yetkisi)."""
+    k = aktif_kullanici()
+    return bool(k and k.get("rol") == "yonetici")
 
 
 # --------------------------------------------------------------------------- #
@@ -246,6 +325,28 @@ def fis_durum_guncelle(musteri_id, donem, anahtar, yeni_durum, kullanici_ad=""):
                                 "kullanici": kullanici_ad}
     _yaz(_durum_yol(musteri_id, donem), durum)
     return durum["fisler"][anahtar]
+
+
+def gecici_vergi_oku(musteri_id, donem):
+    """Donem icin gecici vergi KKEG/parametre girislerini doner (musavir girisi)."""
+    durum = _oku(_durum_yol(musteri_id, donem), None)
+    if durum is None:
+        return {}
+    return durum.get("gecici_vergi", {})
+
+
+def gecici_vergi_yaz(musteri_id, donem, veri, kullanici_ad=""):
+    """Musavirin girdigi KKEG tutarlari + indirim/mahsup parametrelerini saklar."""
+    durum = _oku(_durum_yol(musteri_id, donem), None)
+    if durum is None:
+        return None
+    mevcut = durum.get("gecici_vergi", {})
+    mevcut.update(veri)
+    mevcut["_guncelleyen"] = kullanici_ad
+    mevcut["_zaman"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+    durum["gecici_vergi"] = mevcut
+    _yaz(_durum_yol(musteri_id, donem), durum)
+    return mevcut
 
 
 def _genel_ilerleme(durum):

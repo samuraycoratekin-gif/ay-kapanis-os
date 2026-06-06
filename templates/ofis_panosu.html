@@ -8,13 +8,41 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/static/stil.css">
+  <script>
+    (function(){
+      var TEMALAR = [
+        {kod:'lacivert', ad:'Lacivert', ikon:'fa-moon'},
+        {kod:'antrasit', ad:'Antrasit', ikon:'fa-circle-half-stroke'},
+        {kod:'acik', ad:'Açık', ikon:'fa-sun'}
+      ];
+      function uygula(kod){
+        document.documentElement.setAttribute('data-tema', kod);
+        var t = TEMALAR.filter(function(x){return x.kod===kod;})[0] || TEMALAR[0];
+        var btn = document.getElementById('tema-btn');
+        if (btn) btn.innerHTML = '<i class="fa-solid '+t.ikon+'"></i> '+t.ad;
+      }
+      var mevcut = 'lacivert';
+      try { mevcut = localStorage.getItem('aykapanis_tema') || 'lacivert'; } catch(e){}
+      document.documentElement.setAttribute('data-tema', mevcut);
+      window.temaDegistir = function(){
+        var akt = document.documentElement.getAttribute('data-tema');
+        var i = 0; for (var k=0;k<TEMALAR.length;k++){ if(TEMALAR[k].kod===akt){ i=k; break; } }
+        var yeni = TEMALAR[(i+1) % TEMALAR.length].kod;
+        try { localStorage.setItem('aykapanis_tema', yeni); } catch(e){}
+        uygula(yeni);
+      };
+      document.addEventListener('DOMContentLoaded', function(){
+        uygula(document.documentElement.getAttribute('data-tema'));
+      });
+    })();
+  </script>
   <style>
-    .ayar-girdi { width:100%; margin-top:8px; background:rgba(7,10,19,0.6); color:var(--text-main);
+    .ayar-girdi { width:100%; margin-top:8px; background:var(--input-bg); color:var(--text-main);
       border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:8px 10px;
       font-family:inherit; font-size:18px; font-weight:700; text-align:center; }
     .ayar-girdi:focus { outline:none; border-color:var(--accent-cyan); }
     .zh-satir { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
-    .zh-satir input { background:rgba(7,10,19,0.6); color:var(--text-main);
+    .zh-satir input { background:var(--input-bg); color:var(--text-main);
       border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:8px 10px;
       font-family:inherit; font-size:13px; }
     .zh-satir .zh-kod { width:90px; text-align:center; }
@@ -29,10 +57,11 @@
         <p>Muhasebe Ofisi Panosu — tüm müşterilerin kapanış durumu</p>
       </div>
       <div class="header-meta">
+        <button class="btn-sec" id="tema-btn" onclick="temaDegistir()" title="Tema değiştir (Lacivert / Antrasit / Açık)"><i class="fa-solid fa-moon"></i> Lacivert</button>
         <label style="display:flex;align-items:center;gap:8px;color:var(--text-muted);font-size:13px;">
           <i class="fa-solid fa-calendar-days"></i> Dönem:
           <select id="donem-sec" onchange="donemDegistir(this.value)"
-            style="background:rgba(7,10,19,0.6);color:var(--text-main);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:6px 10px;font-family:inherit;font-size:13px;"></select>
+            style="background:var(--input-bg);color:var(--text-main);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:6px 10px;font-family:inherit;font-size:13px;"></select>
         </label>
         <div class="status-badge"><div class="pulse"></div><span>Aktif Dönem: <span id="aktif-donem"></span></span></div>
       </div>
@@ -121,6 +150,39 @@
           <button class="btn-sec" onclick="ayarlarYukle()"><i class="fa-solid fa-rotate-left"></i> Geri Al</button>
           <span id="ayar-durum" style="font-size:13px;"></span>
         </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:18px;" id="kullanici-panel">
+      <div class="panel-header" style="cursor:pointer;" onclick="kullanicilarAc()">
+        <div class="panel-title">
+          <h2><i class="fa-solid fa-users-gear"></i> Kullanıcılar &amp; Yetkiler</h2>
+          <p>Ofis personelini ve rollerini yönetin. Düzenleme yalnızca Ofis Yöneticisinde.</p>
+        </div>
+        <button class="btn-sec" id="ku-tetik"><i class="fa-solid fa-chevron-down"></i> Aç / Kapat</button>
+      </div>
+      <div id="ku-govde" style="display:none;">
+        <div id="ku-aktif-serit" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:var(--input-bg);border:1px solid var(--border-color);border-radius:10px;">
+          <i class="fa-solid fa-user-tie" style="color:var(--accent-cyan)"></i>
+          <span style="color:var(--text-muted);font-size:13px;">İşlem yapan:</span>
+          <select id="ku-aktif-sec" onchange="aktifKullaniciDegistir(this.value)"
+                  style="background:transparent;border:none;color:var(--text-main);font:inherit;font-weight:700;cursor:pointer;outline:none;"></select>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>Ad</th><th>Rol</th><th style="text-align:right;">İşlem</th></tr></thead>
+            <tbody id="ku-tablo"></tbody>
+          </table>
+        </div>
+        <div id="ku-ekle" style="display:none;margin-top:14px;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input id="ku-ad" placeholder="Ad Soyad" style="flex:1;min-width:180px;">
+          <select id="ku-rol"></select>
+          <button class="btn" onclick="kullaniciEkle()"><i class="fa-solid fa-user-plus"></i> Personel Ekle</button>
+        </div>
+        <div id="ku-kilit-not" style="display:none;margin-top:12px;font-size:13px;color:var(--text-muted);">
+          <i class="fa-solid fa-lock"></i> Personel ekleme/silme ve rol değiştirme yalnızca <strong>Ofis Yöneticisi</strong> tarafından yapılabilir.
+        </div>
+        <span id="ku-durum" style="display:block;margin-top:10px;font-size:13px;"></span>
       </div>
     </div>
 
@@ -243,6 +305,74 @@
       if (d.ok) { du.innerText = '✓ Kaydedildi — sonraki taramalarda geçerli.'; du.style.color = 'var(--accent-emerald)'; }
       else { du.innerText = '✗ ' + (d.hata || 'Kaydedilemedi'); du.style.color = 'var(--accent-rose)'; }
     }
+
+    // --- Kullanicilar & Yetkiler ---
+    let KU_AKTIF = null, KU_ROLLER = {}, KU_LISTE = [];
+    function kullanicilarAc() {
+      const g = document.getElementById('ku-govde');
+      const ac = g.style.display === 'none';
+      g.style.display = ac ? 'block' : 'none';
+      document.getElementById('ku-tetik').innerHTML =
+        (ac ? '<i class="fa-solid fa-chevron-up"></i>' : '<i class="fa-solid fa-chevron-down"></i>') + ' Aç / Kapat';
+      if (ac) kullanicilarYukle();
+    }
+    async function kullanicilarYukle() {
+      const r = await fetch('/api/kullanicilar');
+      const d = await r.json();
+      KU_ROLLER = d.roller || {}; KU_AKTIF = d.aktif; KU_LISTE = d.kullanicilar || [];
+      const yonetici = KU_AKTIF && KU_AKTIF.rol === 'yonetici';
+      // Islem yapan secici
+      const asel = document.getElementById('ku-aktif-sec');
+      asel.innerHTML = KU_LISTE.map(k =>
+        `<option value="${k.id}" ${KU_AKTIF && k.id===KU_AKTIF.id?'selected':''}>${k.ad} — ${KU_ROLLER[k.rol]||k.rol}</option>`).join('');
+      // Rol secenekleri (ekleme + satir)
+      const rolOpts = (sec) => Object.entries(KU_ROLLER).map(([k,v]) =>
+        `<option value="${k}" ${k===sec?'selected':''}>${v}</option>`).join('');
+      document.getElementById('ku-rol').innerHTML = rolOpts('eleman');
+      // Tablo
+      document.getElementById('ku-tablo').innerHTML = KU_LISTE.map(k => {
+        const aktifMi = KU_AKTIF && k.id===KU_AKTIF.id;
+        const rolHuc = yonetici
+          ? `<select onchange="kullaniciRol('${k.id}', this.value)">${rolOpts(k.rol)}</select>`
+          : `<span class="badge neutral">${KU_ROLLER[k.rol]||k.rol}</span>`;
+        const silHuc = yonetici
+          ? `<button class="btn-sec" title="Sil" onclick="kullaniciSil('${k.id}','${k.ad.replace(/'/g,"")}')"><i class="fa-solid fa-trash"></i></button>`
+          : '';
+        return `<tr><td><strong>${k.ad}</strong>${aktifMi?' <span class="badge success">işlem yapan</span>':''}</td>
+          <td>${rolHuc}</td><td style="text-align:right;">${silHuc}</td></tr>`;
+      }).join('');
+      // Yonetici degilse ekleme gizli + not goster
+      document.getElementById('ku-ekle').style.display = yonetici ? 'flex' : 'none';
+      document.getElementById('ku-kilit-not').style.display = yonetici ? 'none' : 'block';
+      document.getElementById('ku-durum').innerText = '';
+    }
+    function kuDurum(d) {
+      const el = document.getElementById('ku-durum');
+      if (d.ok) { el.innerText = '✓ Güncellendi.'; el.style.color = 'var(--accent-emerald)'; }
+      else { el.innerText = '✗ ' + (d.hata || 'İşlem başarısız'); el.style.color = 'var(--accent-rose)'; }
+    }
+    async function aktifKullaniciDegistir(id) {
+      await fetch('/api/aktif_kullanici', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id})});
+      kullanicilarYukle();   // rol degisince yetkiler de yenilensin
+    }
+    async function kullaniciEkle() {
+      const ad = document.getElementById('ku-ad').value.trim();
+      const rol = document.getElementById('ku-rol').value;
+      if (!ad) { kuDurum({hata:'Ad zorunlu.'}); return; }
+      const r = await fetch('/api/kullanici_ekle', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ad, rol})});
+      const d = await r.json(); kuDurum(d);
+      if (d.ok) { document.getElementById('ku-ad').value = ''; kullanicilarYukle(); }
+    }
+    async function kullaniciRol(id, rol) {
+      const r = await fetch('/api/kullanici_rol', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id, rol})});
+      const d = await r.json(); kuDurum(d); kullanicilarYukle();
+    }
+    async function kullaniciSil(id, ad) {
+      if (!confirm(ad + ' silinsin mi?')) return;
+      const r = await fetch('/api/kullanici_sil', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id})});
+      const d = await r.json(); kuDurum(d); kullanicilarYukle();
+    }
+
     yukle();
   </script>
 </body>

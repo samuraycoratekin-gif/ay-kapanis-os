@@ -11,7 +11,10 @@ def kayitli_yukle():
     from . import m13_stok        # noqa: F401
     from . import m12_bordro      # noqa: F401
     from . import m11_beyan       # noqa: F401
-    from . import m10_enflasyon   # noqa: F401
+    # Enflasyon muhasebesi bu yil kullanilmiyor -> arsivlendi (dosyalar duruyor).
+    # Ihtiyac olursa asagidaki satiri ac; sira=8 slotu gecici vergiye verildi.
+    # from . import m10_enflasyon   # noqa: F401  (ARSIV)
+    from . import m10_gecici_vergi  # noqa: F401
     from . import m6_fis          # noqa: F401
     from . import m9_finansal     # noqa: F401
     from . import m7_eksik        # noqa: F401

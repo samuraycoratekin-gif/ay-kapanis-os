@@ -138,4 +138,4 @@ def panel_html(sonuc):
     return ust + t_neg + t_satis + t_atil + t_ka
 
 
-kaydet(Modul("m13_stok", AD, "fa-boxes-stacked", 5, calistir, panel_html))
+kaydet(Modul("m13_stok", AD, "fa-boxes-stacked", 6, calistir, panel_html))

@@ -37,7 +37,7 @@ def _baglam(musteri_id, donem):
     if depo.yuklenen_bul(musteri_id, donem, "m4_gib_kdv", rol="tevkifat"):
         bg["tevkifat_var"] = True
     # Bordro: m12 yuklemesi varsa kesin beklenir
-    if depo.yuklenen_bul(musteri_id, donem, "m12_bordro"):
+    if depo.yuklenen_bul(musteri_id, donem, "m12_bordro", rol="icmal"):
         bg["bordro_var"] = True
     return bg
 
@@ -130,4 +130,4 @@ def panel_html(sonuc):
     return ust + b_gecti + b_kritik + b_all
 
 
-kaydet(Modul("m11_beyan", AD, "fa-calendar-check", 7, calistir, panel_html))
+kaydet(Modul("m11_beyan", AD, "fa-calendar-check", 11, calistir, panel_html))

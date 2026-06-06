@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Platform Yönetimi — Ay Kapanış OS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --bg-dark: #0e1d3d;
+      --bg-card: rgba(23, 37, 68, 0.55);
+      --border-card: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #14b8a6;
+      --accent-rose: #f43f5e;
+      --accent-emerald: #10b981;
+      --accent-gold: #f59e0b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif; background-color: var(--bg-dark);
+      color: var(--text-main); min-height: 100vh; padding: 28px; position: relative; overflow-x: hidden;
+    }
+    .glow-orb { position: absolute; border-radius: 50%; filter: blur(110px); z-index: 0; opacity: 0.18; }
+    .orb-1 { width: 420px; height: 420px; background: var(--accent-cyan); top: -120px; right: -80px; }
+    .orb-2 { width: 480px; height: 480px; background: #6366f1; bottom: -160px; left: -120px; }
+    .wrap { max-width: 1080px; margin: 0 auto; position: relative; z-index: 10; }
+    header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 24px; }
+    .brand-logo {
+      font-family:'Outfit',sans-serif; font-size: 24px; font-weight: 800; letter-spacing:-0.5px;
+      background: linear-gradient(135deg,#fff 30%, var(--accent-cyan));
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      display:inline-flex; align-items:center; gap:10px;
+    }
+    .brand-logo i { -webkit-text-fill-color: var(--accent-cyan); }
+    .brand-logo small { display:block; font-size:12px; font-weight:500; color:var(--text-muted);
+      -webkit-text-fill-color: var(--text-muted); margin-top:2px; }
+    .cikis { color: var(--text-muted); text-decoration:none; font-size:13px; font-weight:600;
+      padding:9px 16px; border-radius:10px; border:1px solid var(--border-card); background: rgba(255,255,255,0.04); }
+    .cikis:hover { color: var(--text-main); }
+    .card {
+      background: var(--bg-card); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-card); border-radius: 18px; padding: 24px; margin-bottom: 22px;
+    }
+    .card h2 { font-family:'Outfit',sans-serif; font-size:17px; font-weight:700; margin-bottom:4px;
+      display:flex; align-items:center; gap:9px; }
+    .card h2 i { color: var(--accent-cyan); }
+    .card .sub { font-size:13px; color:var(--text-muted); margin-bottom:18px; }
+    .grid { display:grid; grid-template-columns: 2fr 1fr 2fr 1.4fr 1fr; gap:12px; align-items:end; }
+    label { display:block; font-size:12px; font-weight:600; margin-bottom:6px; color:#cbd5e1; }
+    input, select {
+      width:100%; padding:11px 13px; border-radius:10px; font-size:14px; color:var(--text-main);
+      background: rgba(7,10,19,0.5); border:1px solid var(--border-card); outline:none; font-family:'Inter',sans-serif;
+    }
+    input:focus, select:focus { border-color: var(--accent-cyan); }
+    .btn {
+      cursor:pointer; padding:11px 18px; border-radius:10px; font-size:14px; font-weight:700;
+      font-family:'Outfit',sans-serif; border:none; transition: all .15s ease; white-space:nowrap;
+    }
+    .btn-primary { background: linear-gradient(135deg,var(--accent-cyan),#0d9488); color:#fff; width:100%; }
+    .btn-primary:hover { filter: brightness(1.1); }
+    .btn-sm { padding:7px 12px; font-size:12px; }
+    .btn-ghost { background: rgba(255,255,255,0.06); color:var(--text-muted); }
+    .btn-ghost:hover { color:var(--text-main); }
+    .btn-warn { background: rgba(245,158,11,0.14); color: var(--accent-gold); }
+    .btn-danger { background: rgba(244,63,94,0.14); color: var(--accent-rose); }
+    .btn-ok { background: rgba(16,185,129,0.14); color: var(--accent-emerald); }
+    table { width:100%; border-collapse: collapse; }
+    th { text-align:left; font-size:12px; color:var(--text-muted); font-weight:600; padding:10px 12px;
+      border-bottom:1px solid var(--border-card); text-transform:uppercase; letter-spacing:0.3px; }
+    td { padding:13px 12px; font-size:14px; border-bottom:1px solid rgba(255,255,255,0.04); }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+    .b-ofis { background: rgba(99,102,241,0.15); color:#a5b4fc; }
+    .b-sirket { background: rgba(20,184,166,0.15); color:#5eead4; }
+    .b-aktif { background: rgba(16,185,129,0.15); color:#6ee7b7; }
+    .b-pasif { background: rgba(148,163,184,0.15); color:#cbd5e1; }
+    .eposta { color:var(--text-muted); font-size:13px; }
+    .aksiyon { display:flex; gap:7px; flex-wrap:wrap; }
+    .durum { font-size:13px; margin-top:14px; min-height:18px; }
+    .durum.ok { color: var(--accent-emerald); }
+    .durum.err { color: var(--accent-rose); }
+    .bos { text-align:center; color:var(--text-muted); padding:30px; font-size:14px; }
+    @media (max-width: 860px) { .grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <div class="glow-orb orb-1"></div>
+  <div class="glow-orb orb-2"></div>
+  <div class="wrap">
+    <header>
+      <div class="brand-logo"><i class="fa-solid fa-tower-broadcast"></i> Platform Yönetimi
+        <small>Ay Kapanış OS — kiracı (ofis / şirket) kayıt defteri</small></div>
+      <a class="cikis" href="/cikis"><i class="fa-solid fa-right-from-bracket"></i> Çıkış</a>
+    </header>
+
+    <div class="card">
+      <h2><i class="fa-solid fa-building-circle-arrow-right"></i> Yeni Kiracı Ekle</h2>
+      <div class="sub">Bir ofis veya şirketle anlaştığınızda buradan giriş kimliğini tanımlayın. Şifre pbkdf2 ile hash'lenir; düz parola saklanmaz. Kiracı ilk girişte boş başlar ve kurulum sihirbazına düşer.</div>
+      <div class="grid">
+        <div><label>Ünvan</label><input id="f-unvan" placeholder="Örn. Yılmaz Mali Müşavirlik"></div>
+        <div><label>Tip</label>
+          <select id="f-tip"><option value="ofis">Muhasebe Ofisi</option><option value="sirket">Şirket</option></select>
+        </div>
+        <div><label>Giriş e-postası</label><input id="f-eposta" type="email" placeholder="ofis@firma.com"></div>
+        <div><label>Geçici parola</label><input id="f-parola" placeholder="en az 4 karakter"></div>
+        <div><button class="btn btn-primary" onclick="kiraciEkle()"><i class="fa-solid fa-plus"></i> Ekle</button></div>
+      </div>
+      <div class="durum" id="ekle-durum"></div>
+    </div>
+
+    <div class="card">
+      <h2><i class="fa-solid fa-list"></i> Kiracılar</h2>
+      <div class="sub">Her kiracının verisi tamamen izoledir. Pasif yapılan kiracı giriş yapamaz.</div>
+      <table>
+        <thead><tr><th>Ünvan</th><th>Tip</th><th>E-posta</th><th>Paket</th><th>Durum</th><th>Oluşturma</th><th>İşlemler</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="durum" id="liste-durum"></div>
+    </div>
+  </div>
+
+  <script>
+    async function yukle() {
+      const r = await fetch('/api/kiracilar');
+      if (r.status === 401) { window.location.href = '/giris'; return; }
+      const d = await r.json();
+      const tb = document.getElementById('tbody');
+      tb.innerHTML = '';
+      if (!d.kiracilar || !d.kiracilar.length) {
+        tb.innerHTML = '<tr><td colspan="7" class="bos">Henüz kiracı yok. Yukarıdan ekleyin.</td></tr>';
+        return;
+      }
+      d.kiracilar.forEach(k => {
+        const tr = document.createElement('tr');
+        const tipB = k.tip === 'sirket' ? 'b-sirket' : 'b-ofis';
+        const durB = k.aktif ? 'b-aktif' : 'b-pasif';
+        const durMetin = k.aktif ? 'Aktif' : 'Pasif';
+        const toggle = k.aktif
+          ? `<button class="btn btn-sm btn-warn" onclick="durum('${k.id}',false)"><i class="fa-solid fa-pause"></i> Pasif</button>`
+          : `<button class="btn btn-sm btn-ok" onclick="durum('${k.id}',true)"><i class="fa-solid fa-play"></i> Aktif</button>`;
+        tr.innerHTML = `
+          <td><strong>${esc(k.unvan)}</strong><br><span class="eposta">${k.id}</span></td>
+          <td><span class="badge ${tipB}">${esc(k.tip_ad)}</span></td>
+          <td class="eposta">${esc(k.eposta)}</td>
+          <td>${esc(k.paket || '-')}</td>
+          <td><span class="badge ${durB}">${durMetin}</span></td>
+          <td class="eposta">${esc(k.olusturma || '-')}</td>
+          <td><div class="aksiyon">
+            ${toggle}
+            <button class="btn btn-sm btn-ghost" onclick="parola('${k.id}','${esc(k.unvan)}')"><i class="fa-solid fa-key"></i> Parola</button>
+          </div></td>`;
+        tb.appendChild(tr);
+      });
+    }
+
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g,
+      c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    function durumYaz(id, msg, ok) {
+      const e = document.getElementById(id);
+      e.textContent = msg; e.className = 'durum ' + (ok ? 'ok' : 'err');
+      setTimeout(() => { if (e.textContent === msg) e.textContent = ''; }, 4000);
+    }
+
+    async function kiraciEkle() {
+      const payload = {
+        unvan: document.getElementById('f-unvan').value.trim(),
+        tip: document.getElementById('f-tip').value,
+        eposta: document.getElementById('f-eposta').value.trim(),
+        parola: document.getElementById('f-parola').value.trim(),
+      };
+      const r = await fetch('/api/kiraci_ekle', { method:'POST',
+        headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      const d = await r.json();
+      if (d.ok) {
+        durumYaz('ekle-durum', `${d.kiraci.unvan} eklendi (${d.kiraci.id}).`, true);
+        document.getElementById('f-unvan').value = '';
+        document.getElementById('f-eposta').value = '';
+        document.getElementById('f-parola').value = '';
+        yukle();
+      } else { durumYaz('ekle-durum', d.hata || 'Hata.', false); }
+    }
+
+    async function durum(id, aktif) {
+      const r = await fetch('/api/kiraci_durum', { method:'POST',
+        headers:{'Content-Type':'application/json'}, body: JSON.stringify({id, aktif}) });
+      const d = await r.json();
+      if (d.ok) { durumYaz('liste-durum', aktif ? 'Kiracı aktifleştirildi.' : 'Kiracı pasif yapıldı.', true); yukle(); }
+      else { durumYaz('liste-durum', d.hata || 'Hata.', false); }
+    }
+
+    async function parola(id, unvan) {
+      const yeni = prompt(`"${unvan}" için yeni parola (en az 4 karakter):`);
+      if (yeni === null) return;
+      const r = await fetch('/api/kiraci_parola', { method:'POST',
+        headers:{'Content-Type':'application/json'}, body: JSON.stringify({id, parola: yeni.trim()}) });
+      const d = await r.json();
+      if (d.ok) durumYaz('liste-durum', 'Parola güncellendi.', true);
+      else durumYaz('liste-durum', d.hata || 'Hata.', false);
+    }
+
+    yukle();
+  </script>
+</body>
+</html>

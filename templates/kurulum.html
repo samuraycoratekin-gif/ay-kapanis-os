@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kurulum — Ay Kapanış OS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --bg-dark: #0e1d3d;
+      --bg-card: rgba(23, 37, 68, 0.55);
+      --border-card: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #14b8a6;
+      --accent-rose: #f43f5e;
+      --accent-emerald: #10b981;
+      --accent-gold: #f59e0b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+      overflow-x: hidden; position: relative; padding: 24px;
+    }
+    .glow-orb { position: absolute; border-radius: 50%; filter: blur(100px); z-index: 0; opacity: 0.20; }
+    .orb-1 { width: 400px; height: 400px; background: var(--accent-cyan); top: -100px; left: -100px; }
+    .orb-2 { width: 500px; height: 500px; background: #6366f1; bottom: -150px; right: -150px; }
+    .wrap { width: 100%; max-width: 720px; z-index: 10; position: relative; }
+    .brand { text-align: center; margin-bottom: 22px; }
+    .brand-logo {
+      font-family: 'Outfit', sans-serif; font-size: 26px; font-weight: 800;
+      letter-spacing: -0.5px; background: linear-gradient(135deg, #fff 30%, var(--accent-cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      display: inline-flex; align-items: center; gap: 10px; margin-bottom: 6px;
+    }
+    .brand-logo i { -webkit-text-fill-color: var(--accent-cyan); }
+    .brand-sub { font-size: 14px; color: var(--text-muted); }
+    .card {
+      background: var(--bg-card); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-card); border-radius: 20px; padding: 30px;
+    }
+    .steps { display: flex; gap: 10px; margin-bottom: 24px; }
+    .step-pill {
+      flex: 1; text-align: center; font-size: 13px; font-weight: 600; color: var(--text-muted);
+      padding: 8px 6px; border-radius: 10px; background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border-card);
+    }
+    .step-pill.active { color: var(--text-main); border-color: var(--accent-cyan);
+      background: rgba(20,184,166,0.12); }
+    .step-pill .n { display:inline-flex; width:20px; height:20px; border-radius:50%;
+      background: rgba(255,255,255,0.1); align-items:center; justify-content:center;
+      font-size:11px; margin-right:6px; }
+    .step-pill.active .n { background: var(--accent-cyan); color:#06281f; }
+    .step { display: none; }
+    .step.active { display: block; animation: fade .25s ease; }
+    @keyframes fade { from { opacity:0; transform: translateY(6px);} to {opacity:1; transform:none;} }
+    h2 { font-family:'Outfit',sans-serif; font-size: 20px; font-weight:700; margin-bottom:6px; }
+    .hint { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height:1.5; }
+    label { display:block; font-size: 13px; font-weight:600; margin-bottom:7px; color:#cbd5e1; }
+    input[type=text] {
+      width:100%; padding:13px 15px; border-radius:12px; font-size:15px; color:var(--text-main);
+      background: rgba(7,10,19,0.5); border:1px solid var(--border-card); outline:none;
+      margin-bottom: 18px; font-family:'Inter',sans-serif;
+    }
+    input[type=text]:focus { border-color: var(--accent-cyan); }
+    .erp-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; margin-bottom: 18px; }
+    .erp-card {
+      cursor:pointer; padding:18px 12px; border-radius:14px; text-align:center;
+      background: rgba(7,10,19,0.4); border:1.5px solid var(--border-card);
+      transition: all .15s ease; font-weight:600; font-size:14px;
+    }
+    .erp-card:hover { border-color: rgba(20,184,166,0.5); transform: translateY(-2px); }
+    .erp-card.sel { border-color: var(--accent-cyan); background: rgba(20,184,166,0.14); }
+    .erp-card i { display:block; font-size:22px; margin-bottom:8px; color: var(--accent-cyan); }
+    .baglanti-kutu {
+      display:none; padding:16px; border-radius:12px; margin-bottom:18px;
+      background: rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25);
+      font-size: 13px; line-height:1.55; color:#fde68a;
+    }
+    .baglanti-kutu.dosya { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.25); color:#a7f3d0; }
+    .baglanti-kutu i { margin-right:6px; }
+    .row { display:flex; gap:12px; justify-content:space-between; margin-top: 8px; }
+    button {
+      cursor:pointer; padding:13px 22px; border-radius:12px; font-size:15px; font-weight:700;
+      font-family:'Outfit',sans-serif; border:none; transition: all .15s ease;
+    }
+    .btn-primary { background: linear-gradient(135deg, var(--accent-cyan), #0d9488); color:#fff; }
+    .btn-primary:hover { filter: brightness(1.1); }
+    .btn-primary:disabled { opacity:0.4; cursor:not-allowed; }
+    .btn-ghost { background: rgba(255,255,255,0.06); color: var(--text-muted); }
+    .btn-ghost:hover { color: var(--text-main); }
+    .hata { color: var(--accent-rose); font-size:13px; margin-top:12px; min-height:18px; }
+  </style>
+</head>
+<body>
+  <div class="glow-orb orb-1"></div>
+  <div class="glow-orb orb-2"></div>
+  <div class="wrap">
+    <div class="brand">
+      <div class="brand-logo"><i class="fa-solid fa-moon"></i> Ay Kapanış OS</div>
+      <div class="brand-sub" id="hosgeldin">Kuruluma hoş geldiniz</div>
+    </div>
+    <div class="card">
+      <div class="steps">
+        <div class="step-pill active" id="pill1"><span class="n">1</span>Kimlik</div>
+        <div class="step-pill" id="pill2"><span class="n">2</span>Muhasebe Programı</div>
+      </div>
+
+      <!-- Adim 1 -->
+      <div class="step active" id="step1">
+        <h2 id="s1baslik">Ofis Bilgileri</h2>
+        <p class="hint" id="s1hint">Sistemde görünecek adınızı ve ilk yönetici kullanıcıyı belirleyin. Her şey bu hesaba özeldir; başka kiracılarla karışmaz.</p>
+        <label id="lbl-ofis">Ofis / Şirket adı</label>
+        <input type="text" id="ofis_adi" placeholder="Örn. Yılmaz Mali Müşavirlik">
+        <label>Yönetici adınız (ilk kullanıcı)</label>
+        <input type="text" id="yonetici_ad" placeholder="Örn. Ayşe Yılmaz">
+        <div class="row" style="justify-content:flex-end;">
+          <button class="btn-primary" id="ileri" onclick="ileri()">Devam <i class="fa-solid fa-arrow-right"></i></button>
+        </div>
+      </div>
+
+      <!-- Adim 2 -->
+      <div class="step" id="step2">
+        <h2>Hangi programla çalışıyorsunuz?</h2>
+        <p class="hint" id="s2hint">En sık kullandığınız muhasebe programını seçin. Müşteri bazında daha sonra değiştirebilirsiniz. Şifreniz hiçbir zaman bizde saklanmaz.</p>
+        <div class="erp-grid" id="erpGrid"></div>
+        <div class="baglanti-kutu" id="baglantiKutu"></div>
+        <div class="row">
+          <button class="btn-ghost" onclick="geri()"><i class="fa-solid fa-arrow-left"></i> Geri</button>
+          <button class="btn-primary" id="bitir" onclick="tamamla()" disabled>Kurulumu Tamamla <i class="fa-solid fa-check"></i></button>
+        </div>
+        <div class="hata" id="hata"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let BILGI = null, SECILI_ERP = null, ACIKLAMA = {};
+
+    async function yukle() {
+      const r = await fetch('/api/kurulum_bilgi');
+      BILGI = await r.json();
+      ACIKLAMA = BILGI.baglanti_aciklama || {};
+      // tip'e gore metinleri uyarla
+      const sirket = BILGI.tip === 'sirket';
+      document.getElementById('hosgeldin').textContent =
+        (BILGI.unvan ? BILGI.unvan + ' • ' : '') + (sirket ? 'Şirket kurulumu' : 'Ofis kurulumu');
+      document.getElementById('s1baslik').textContent = sirket ? 'Şirket Bilgileri' : 'Ofis Bilgileri';
+      document.getElementById('lbl-ofis').textContent = sirket ? 'Şirket adı' : 'Ofis / Şirket adı';
+      if (BILGI.unvan) document.getElementById('ofis_adi').value = BILGI.unvan;
+      if (sirket) document.getElementById('s2hint').textContent =
+        'Şirketinizin kullandığı muhasebe programını seçin. Şifreniz hiçbir zaman bizde saklanmaz.';
+      // ERP kartlari
+      const ikon = { parasut:'fa-bolt', logo:'fa-cubes', mikro:'fa-microchip',
+                     netsis:'fa-network-wired', luca:'fa-calculator', dosya:'fa-file-arrow-up' };
+      const g = document.getElementById('erpGrid');
+      g.innerHTML = '';
+      (BILGI.erp_secenekleri || []).forEach(e => {
+        const d = document.createElement('div');
+        d.className = 'erp-card'; d.dataset.kod = e.kod; d.dataset.yontem = e.yontem;
+        d.innerHTML = `<i class="fa-solid ${ikon[e.kod]||'fa-database'}"></i>${e.ad}`;
+        d.onclick = () => erpSec(e.kod, e.yontem);
+        g.appendChild(d);
+      });
+    }
+
+    function erpSec(kod, yontem) {
+      SECILI_ERP = kod;
+      document.querySelectorAll('.erp-card').forEach(c =>
+        c.classList.toggle('sel', c.dataset.kod === kod));
+      const kutu = document.getElementById('baglantiKutu');
+      const ikon = yontem === 'dosya' ? 'fa-shield-halved' : 'fa-clock';
+      kutu.className = 'baglanti-kutu' + (yontem === 'dosya' ? ' dosya' : '');
+      kutu.style.display = 'block';
+      kutu.innerHTML = `<i class="fa-solid ${ikon}"></i>${ACIKLAMA[yontem] || ''}`;
+      document.getElementById('bitir').disabled = false;
+    }
+
+    function ileri() {
+      const ad = document.getElementById('yonetici_ad').value.trim();
+      if (!ad) { document.getElementById('yonetici_ad').focus(); return; }
+      document.getElementById('step1').classList.remove('active');
+      document.getElementById('step2').classList.add('active');
+      document.getElementById('pill1').classList.remove('active');
+      document.getElementById('pill2').classList.add('active');
+    }
+    function geri() {
+      document.getElementById('step2').classList.remove('active');
+      document.getElementById('step1').classList.add('active');
+      document.getElementById('pill2').classList.remove('active');
+      document.getElementById('pill1').classList.add('active');
+    }
+
+    async function tamamla() {
+      const btn = document.getElementById('bitir');
+      btn.disabled = true;
+      const payload = {
+        ofis_adi: document.getElementById('ofis_adi').value.trim(),
+        yonetici_ad: document.getElementById('yonetici_ad').value.trim(),
+        erp_tipi: SECILI_ERP || 'dosya',
+      };
+      const r = await fetch('/api/kurulum', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload) });
+      const d = await r.json();
+      if (d.ok) { window.location.href = '/'; }
+      else { document.getElementById('hata').textContent = d.hata || 'Bir hata oluştu.'; btn.disabled = false; }
+    }
+
+    yukle();
+  </script>
+</body>
+</html>

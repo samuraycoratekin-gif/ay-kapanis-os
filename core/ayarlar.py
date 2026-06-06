@@ -9,11 +9,21 @@ diger moduller de zamanla bu katmana tasinabilir.
 """
 import os, json
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
-AYAR_JSON = os.path.join(ROOT, "veri", "ayarlar.json")
+from core import depo
+
+
+def _ayar_json():
+    """Aktif kiracinin ayar dosyasi (cok-kiracili izolasyon)."""
+    return os.path.join(depo._kveri(), "ayarlar.json")
 
 VARSAYILAN = {
+    # Kiraci kurulum (onboarding) durumu. Yeni kiraci ilk girisinde sihirbaz
+    # acilir; tamamlaninca kurulum_tamam=True olur ve dogrudan panoya gecilir.
+    "kurulum_tamam": False,
+    "ofis_adi": "Ay Kapanış OS",       # kiraci goruntuleme adi (panoda baslik)
+    "erp_tipi": "",                    # en sik kullanilan muhasebe programi (varsayilan)
+    "erp_baglanti": "",               # baglama yontemi: oauth | anahtar | dosya
+
     # Donem sonunda mizanda mutlaka hareket/bakiye beklenen kontrol hesaplari.
     # ana_kod -> insana okunur etiket. "Bos" ise SOFT uyari uretilir.
     "zorunlu_hesaplar": {
@@ -73,9 +83,10 @@ def _derin_birlestir(taban, ust):
 def oku():
     """VARSAYILAN ustune veri/ayarlar.json'daki kullanici degerlerini bindirir."""
     kayitli = {}
-    if os.path.exists(AYAR_JSON):
+    yol = _ayar_json()
+    if os.path.exists(yol):
         try:
-            with open(AYAR_JSON, encoding="utf-8") as f:
+            with open(yol, encoding="utf-8") as f:
                 kayitli = json.load(f)
         except Exception:
             kayitli = {}
@@ -89,7 +100,8 @@ def oku():
 
 def yaz(yeni):
     """Kullanici ayarlarini JSON'a yazar (yalnizca verilen alanlar)."""
-    os.makedirs(os.path.dirname(AYAR_JSON), exist_ok=True)
-    with open(AYAR_JSON, "w", encoding="utf-8") as f:
+    yol = _ayar_json()
+    os.makedirs(os.path.dirname(yol), exist_ok=True)
+    with open(yol, "w", encoding="utf-8") as f:
         json.dump(yeni, f, ensure_ascii=False, indent=2)
     return oku()

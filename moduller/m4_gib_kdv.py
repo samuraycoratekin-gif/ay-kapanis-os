@@ -382,4 +382,4 @@ def panel_html(sonuc):
             + _bolum_tevkifat(sonuc) + _bolum_matrah(sonuc))
 
 
-kaydet(Modul("m4_gib_kdv", AD, "fa-building-columns", 3, calistir, panel_html))
+kaydet(Modul("m4_gib_kdv", AD, "fa-building-columns", 5, calistir, panel_html))

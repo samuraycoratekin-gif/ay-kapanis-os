@@ -1,24 +1,74 @@
 /* Ay Kapanis OS - ortak tema (Ay_Kapanis_Dashboard.html maketinden) */
 :root {
-  --bg-dark: #090d16;
-  --bg-card: rgba(15, 23, 42, 0.65);
+  --bg-dark: #0e1d3d;
+  --bg-card: rgba(23, 37, 68, 0.70);
   --border-color: rgba(255, 255, 255, 0.08);
-  --accent-cyan: #06b6d4;
-  --accent-gold: #fbbf24;
+  --accent-cyan: #14b8a6;        /* ana vurgu: teal (premium finans) */
+  --accent-gold: #f59e0b;
   --accent-emerald: #10b981;
-  --accent-purple: #a78bfa;
+  --accent-purple: #6366f1;      /* ikincil: indigo (mor yerine) */
   --accent-rose: #f43f5e;
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
+  --input-bg: rgba(7,10,19,0.6);
+  --logo-grad-1: #ffffff;
+}
+
+/* ===== Tema: Antrasit (koyu) ===== */
+html[data-tema="antrasit"] {
+  --bg-dark: #15181e;
+  --bg-card: rgba(30, 33, 41, 0.78);
+  --border-color: rgba(255, 255, 255, 0.07);
+  --text-main: #f4f4f5;
+  --text-muted: #a1a1aa;
+  --input-bg: rgba(0,0,0,0.35);
+  --logo-grad-1: #ffffff;
+}
+html[data-tema="antrasit"] body {
+  background-image:
+    radial-gradient(at 0% 0%, rgba(20,184,166,0.14) 0, transparent 55%),
+    radial-gradient(at 100% 0%, rgba(16,185,129,0.10) 0, transparent 55%),
+    radial-gradient(at 50% 100%, rgba(245,158,11,0.05) 0, transparent 55%);
+}
+
+/* ===== Tema: Açık (light) ===== */
+html[data-tema="acik"] {
+  --bg-dark: #eef2f7;
+  --bg-card: rgba(255, 255, 255, 0.88);
+  --border-color: rgba(15, 23, 42, 0.12);
+  --accent-cyan: #0d9488;
+  --accent-purple: #4f46e5;
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --input-bg: rgba(255,255,255,0.95);
+  --logo-grad-1: #0f766e;
+}
+html[data-tema="acik"] body {
+  background-image:
+    radial-gradient(at 0% 0%, rgba(13,148,136,0.10) 0, transparent 55%),
+    radial-gradient(at 100% 0%, rgba(16,185,129,0.08) 0, transparent 55%),
+    radial-gradient(at 50% 100%, rgba(245,158,11,0.06) 0, transparent 55%);
+}
+html[data-tema="acik"] header,
+html[data-tema="acik"] .sidebar,
+html[data-tema="acik"] .panel,
+html[data-tema="acik"] .stat-card,
+html[data-tema="acik"] .feature-box {
+  box-shadow: 0 8px 28px rgba(15,23,42,0.10);
+}
+html[data-tema="acik"] input,
+html[data-tema="acik"] select,
+html[data-tema="acik"] input[type=text] {
+  color: var(--text-main);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: 'Inter', sans-serif;
   background-color: var(--bg-dark);
   background-image:
-    radial-gradient(at 0% 0%, rgba(6,182,212,0.12) 0, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(167,139,250,0.1) 0, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(16,185,129,0.06) 0, transparent 50%);
+    radial-gradient(at 0% 0%, rgba(20,184,166,0.18) 0, transparent 55%),
+    radial-gradient(at 100% 0%, rgba(16,185,129,0.15) 0, transparent 55%),
+    radial-gradient(at 50% 100%, rgba(245,158,11,0.08) 0, transparent 55%);
   background-attachment: fixed;
   color: var(--text-main);
   min-height: 100vh;
@@ -36,7 +86,7 @@ header {
 }
 .logo-area h1 {
   font-family: 'Outfit', sans-serif; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #fff 30%, var(--accent-cyan) 100%);
+  background: linear-gradient(135deg, var(--logo-grad-1) 30%, var(--accent-cyan) 100%);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   display: flex; align-items: center; gap: 10px;
 }
@@ -59,7 +109,7 @@ header {
 @keyframes spin { 100% { transform: rotate(360deg); } }
 
 select, input[type=text] {
-  background: rgba(7,10,19,0.6); border: 1px solid var(--border-color);
+  background: var(--input-bg); border: 1px solid var(--border-color);
   color: var(--text-main); padding: 8px 12px; border-radius: 10px;
   font-family: 'Inter', sans-serif; font-size: 13.5px; outline: none;
 }
@@ -78,6 +128,17 @@ select, input[type=text] {
   text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;
   border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px;
 }
+.nav-grup-baslik {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700;
+  letter-spacing: 1.4px; text-transform: uppercase; color: var(--accent-cyan);
+  padding: 16px 16px 7px; user-select: none;
+}
+.nav-grup-baslik::after {
+  content: ""; flex: 1; height: 1px;
+  background: linear-gradient(90deg, rgba(20,184,166,0.35), transparent);
+}
+.nav-grup-baslik:first-child { padding-top: 4px; }
 .nav-item {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 16px; background: transparent; border: 1px solid transparent;
@@ -87,8 +148,8 @@ select, input[type=text] {
 }
 .nav-item:hover { background: rgba(255,255,255,0.02); color: var(--text-main); transform: translateX(4px); }
 .nav-item.active {
-  background: rgba(6,182,212,0.08); border-color: rgba(6,182,212,0.15);
-  color: var(--accent-cyan); box-shadow: 0 4px 20px -5px rgba(6,182,212,0.25);
+  background: rgba(20,184,166,0.08); border-color: rgba(20,184,166,0.15);
+  color: var(--accent-cyan); box-shadow: 0 4px 20px -5px rgba(20,184,166,0.25);
 }
 .nav-item-left { display: flex; align-items: center; gap: 12px; }
 .nav-item i { font-size: 15px; width: 18px; text-align: center; }
@@ -96,9 +157,30 @@ select, input[type=text] {
   font-size: 11px; background: rgba(255,255,255,0.05); padding: 2px 8px;
   border-radius: 20px; color: var(--text-muted);
 }
-.nav-item.active .nav-progress { background: rgba(6,182,212,0.2); color: var(--accent-cyan); font-weight: 700; }
+.nav-item.active .nav-progress { background: rgba(20,184,166,0.2); color: var(--accent-cyan); font-weight: 700; }
 
 .content-container { display: flex; flex-direction: column; gap: 24px; }
+/* Ince ozet seridi - 4 buyuk kartin yerine: ana icerigin tepesinde tek satir */
+.ozet-serit {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px;
+  background: var(--bg-card); backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color); border-radius: 14px;
+  padding: 10px 18px; font-size: 13px; color: var(--text-muted);
+}
+.ozet-baslik {
+  font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 12px;
+  color: var(--text-main); display: inline-flex; align-items: center; gap: 7px;
+}
+.ozet-baslik i { color: var(--accent-rose); }
+.ozet-oge { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.ozet-oge strong { color: var(--text-main); font-weight: 700; font-family: 'Outfit', sans-serif; }
+.ozet-bar { flex: 1; min-width: 80px; height: 6px; border-radius: 6px;
+  background: rgba(255,255,255,0.06); overflow: hidden; }
+.ozet-bar-dolu { display: block; height: 100%; border-radius: 6px;
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-emerald));
+  transition: width 0.8s ease; }
+.ozet-ayrac { width: 1px; height: 16px; background: var(--border-color); }
+@media (max-width: 768px) { .ozet-bar { order: 5; flex-basis: 100%; } .ozet-ayrac { display: none; } }
 .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
 @media (max-width: 768px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
 .stat-card {
@@ -151,8 +233,8 @@ select, input[type=text] {
 }
 .panel-title p { font-size: 13.5px; color: var(--text-muted); margin-top: 4px; }
 .panel-header-icon {
-  font-size: 20px; color: var(--accent-cyan); background: rgba(6,182,212,0.08);
-  border: 1px solid rgba(6,182,212,0.15); padding: 10px; border-radius: 12px;
+  font-size: 20px; color: var(--accent-cyan); background: rgba(20,184,166,0.08);
+  border: 1px solid rgba(20,184,166,0.15); padding: 10px; border-radius: 12px;
 }
 
 .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
@@ -181,7 +263,7 @@ tr:hover td { background: rgba(255,255,255,0.01); }
   display: inline-flex; align-items: center; gap: 5px;
 }
 .badge.err { background: rgba(244,63,94,0.1); color: var(--accent-rose); border: 1px solid rgba(244,63,94,0.15); }
-.badge.warn { background: rgba(251,191,36,0.1); color: var(--accent-gold); border: 1px solid rgba(251,191,36,0.15); }
+.badge.warn { background: rgba(245,158,11,0.1); color: var(--accent-gold); border: 1px solid rgba(245,158,11,0.15); }
 .badge.success { background: rgba(16,185,129,0.1); color: var(--accent-emerald); border: 1px solid rgba(16,185,129,0.15); }
 .badge.neutral { background: rgba(255,255,255,0.05); color: var(--text-muted); }
 
@@ -189,9 +271,9 @@ tr:hover td { background: rgba(255,255,255,0.01); }
   background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); color: #fff;
   border: none; padding: 12px 24px; font-family: 'Outfit', sans-serif; font-weight: 700;
   font-size: 13.5px; border-radius: 10px; cursor: pointer; display: inline-flex;
-  align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(6,182,212,0.25); transition: all 0.3s;
+  align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(20,184,166,0.25); transition: all 0.3s;
 }
-.btn:hover { box-shadow: 0 4px 22px rgba(6,182,212,0.45); transform: translateY(-1px); }
+.btn:hover { box-shadow: 0 4px 22px rgba(20,184,166,0.45); transform: translateY(-1px); }
 .btn-sec {
   background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: var(--text-main);
   padding: 11px 20px; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 13.5px;
@@ -205,7 +287,7 @@ tr:hover td { background: rgba(255,255,255,0.01); }
 .progress-bar { background: linear-gradient(90deg, var(--accent-cyan), var(--accent-emerald)); height: 100%; border-radius: 10px; transition: width 0.8s ease; }
 
 .notif-pill {
-  background: rgba(6,182,212,0.08); border: 1px solid rgba(6,182,212,0.15); color: var(--accent-cyan);
+  background: rgba(20,184,166,0.08); border: 1px solid rgba(20,184,166,0.15); color: var(--accent-cyan);
   font-size: 12px; padding: 8px 16px; border-radius: 30px; display: inline-flex; align-items: center; gap: 8px;
 }
 .circle-icon-badge { width: 6px; height: 6px; background: var(--accent-cyan); border-radius: 50%; }
@@ -241,11 +323,11 @@ footer {
 }
 .trend-bar {
   flex: 1; min-width: 8px; border-radius: 6px 6px 0 0;
-  background: linear-gradient(180deg, var(--accent-cyan), rgba(6,182,212,0.25));
+  background: linear-gradient(180deg, var(--accent-cyan), rgba(20,184,166,0.25));
   position: relative; transition: filter 0.2s ease;
 }
 .trend-bar:hover { filter: brightness(1.3); }
-.trend-bar.guncel { background: linear-gradient(180deg, var(--accent-gold), rgba(251,191,36,0.3)); }
+.trend-bar.guncel { background: linear-gradient(180deg, var(--accent-gold), rgba(245,158,11,0.3)); }
 .trend-eksen { display: flex; gap: 6px; margin-top: 6px; }
 .trend-eksen span { flex: 1; min-width: 8px; text-align: center; font-size: 10px; color: var(--text-muted); }
 .spark {
