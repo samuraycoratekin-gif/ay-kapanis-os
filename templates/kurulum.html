@@ -64,12 +64,24 @@
     h2 { font-family:'Outfit',sans-serif; font-size: 20px; font-weight:700; margin-bottom:6px; }
     .hint { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height:1.5; }
     label { display:block; font-size: 13px; font-weight:600; margin-bottom:7px; color:#cbd5e1; }
-    input[type=text] {
+    input[type=text], input[type=password] {
       width:100%; padding:13px 15px; border-radius:12px; font-size:15px; color:var(--text-main);
       background: rgba(7,10,19,0.5); border:1px solid var(--border-card); outline:none;
       margin-bottom: 18px; font-family:'Inter',sans-serif;
     }
-    input[type=text]:focus { border-color: var(--accent-cyan); }
+    input[type=text]:focus, input[type=password]:focus { border-color: var(--accent-cyan); }
+    .alan-ipucu { font-size:11px; color:var(--text-muted); margin:-12px 0 16px; }
+    .sifre-sar { position:relative; }
+    .sifre-sar .goster { position:absolute; right:12px; top:13px; cursor:pointer;
+      color:var(--text-muted); font-size:13px; user-select:none; }
+    .paket-pill {
+      cursor:pointer; padding:9px 16px; border-radius:10px; font-size:13px; font-weight:600;
+      color:var(--text-muted); background: rgba(7,10,19,0.4);
+      border:1.5px solid var(--border-card); transition: all .15s ease;
+    }
+    .paket-pill:hover { border-color: rgba(20,184,166,0.5); }
+    .paket-pill.sel { color:var(--text-main); border-color:var(--accent-cyan);
+      background: rgba(20,184,166,0.14); }
     .erp-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; margin-bottom: 18px; }
     .erp-card {
       cursor:pointer; padding:18px 12px; border-radius:14px; text-align:center;
@@ -131,10 +143,37 @@
         <h2>Hangi programla çalışıyorsunuz?</h2>
         <p class="hint" id="s2hint">En sık kullandığınız muhasebe programını seçin. Müşteri bazında daha sonra değiştirebilirsiniz. Şifreniz hiçbir zaman bizde saklanmaz.</p>
         <div class="erp-grid" id="erpGrid"></div>
+        <p class="hint" style="margin:-6px 0 16px; color:#a7f3d0;">
+          <i class="fa-solid fa-circle-info"></i>
+          Programınızı şimdi bağlamak zorunda değilsiniz. <b>“Dosya (Excel)”</b> ile başlayıp
+          mizan/ekstreleri elle yükleyebilir, Luca/Paraşüt bağlantısını sonra kurabilirsiniz.
+        </p>
         <div class="baglanti-kutu" id="baglantiKutu"></div>
+
+        <!-- Luca gibi alt-paketli ERP'lerde paket secimi -->
+        <div id="paketSatir" style="display:none; margin-bottom:14px;">
+          <label>Hangi paket?</label>
+          <div id="paketGrid" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
+        </div>
+
+        <!-- Secilen programa/pakete gore dinamik baglanti alanlari -->
+        <div id="alanlar"></div>
+
+        <!-- Baglanti testi -->
+        <div id="testSatir" style="display:none; margin-bottom:6px;">
+          <button class="btn-ghost" id="testBtn" type="button" onclick="baglantiTest()">
+            <i class="fa-solid fa-plug"></i> Bağlantıyı Test Et</button>
+          <span id="testSonuc" style="font-size:13px; margin-left:10px;"></span>
+        </div>
+        <div class="guvenlik-not" id="guvenlikNot" style="display:none; font-size:12px;
+             color:#a7f3d0; margin:6px 0 16px; line-height:1.5;">
+          <i class="fa-solid fa-lock"></i> Şifre/secret bilgileriniz şifreli saklanır,
+          koda veya git'e gitmez, ekranda bir daha düz gösterilmez.
+        </div>
+
         <div class="row">
           <button class="btn-ghost" onclick="geri()"><i class="fa-solid fa-arrow-left"></i> Geri</button>
-          <button class="btn-primary" id="bitir" onclick="tamamla()" disabled>Kurulumu Tamamla <i class="fa-solid fa-check"></i></button>
+          <button class="btn-primary" id="bitir" onclick="tamamla()">Kurulumu Tamamla <i class="fa-solid fa-check"></i></button>
         </div>
         <div class="hata" id="hata"></div>
       </div>
@@ -142,12 +181,14 @@
   </div>
 
   <script>
-    let BILGI = null, SECILI_ERP = null, ACIKLAMA = {};
+    let BILGI = null, ACIKLAMA = {}, ERPLER = {};
+    let SECILI_ERP = null, SECILI_PAKET = null;
 
     async function yukle() {
       const r = await fetch('/api/kurulum_bilgi');
       BILGI = await r.json();
       ACIKLAMA = BILGI.baglanti_aciklama || {};
+      (BILGI.erp_secenekleri || []).forEach(e => ERPLER[e.kod] = e);
       // tip'e gore metinleri uyarla
       const sirket = BILGI.tip === 'sirket';
       document.getElementById('hosgeldin').textContent =
@@ -164,23 +205,109 @@
       g.innerHTML = '';
       (BILGI.erp_secenekleri || []).forEach(e => {
         const d = document.createElement('div');
-        d.className = 'erp-card'; d.dataset.kod = e.kod; d.dataset.yontem = e.yontem;
+        d.className = 'erp-card'; d.dataset.kod = e.kod;
         d.innerHTML = `<i class="fa-solid ${ikon[e.kod]||'fa-database'}"></i>${e.ad}`;
-        d.onclick = () => erpSec(e.kod, e.yontem);
+        d.onclick = () => erpSec(e.kod);
         g.appendChild(d);
       });
     }
 
-    function erpSec(kod, yontem) {
-      SECILI_ERP = kod;
+    function erpSec(kod) {
+      SECILI_ERP = kod; SECILI_PAKET = null;
       document.querySelectorAll('.erp-card').forEach(c =>
         c.classList.toggle('sel', c.dataset.kod === kod));
+      const e = ERPLER[kod] || {}, yontem = e.yontem;
+      // aciklama kutusu
       const kutu = document.getElementById('baglantiKutu');
-      const ikon = yontem === 'dosya' ? 'fa-shield-halved' : 'fa-clock';
+      const ikon = yontem === 'dosya' ? 'fa-shield-halved'
+                 : yontem === 'yakinda' ? 'fa-clock' : 'fa-key';
       kutu.className = 'baglanti-kutu' + (yontem === 'dosya' ? ' dosya' : '');
       kutu.style.display = 'block';
-      kutu.innerHTML = `<i class="fa-solid ${ikon}"></i>${ACIKLAMA[yontem] || ''}`;
+      kutu.innerHTML = `<i class="fa-solid ${ikon}"></i>${ACIKLAMA[yontem] || ''}` +
+        (e['not'] ? `<br><i class="fa-solid fa-circle-info"></i>${e['not']}` : '');
+      // paket satiri (Luca gibi)
+      const paketSatir = document.getElementById('paketGrid');
+      paketSatir.innerHTML = '';
+      if (e.paketler && e.paketler.length) {
+        document.getElementById('paketSatir').style.display = 'block';
+        e.paketler.forEach(p => {
+          const b = document.createElement('div');
+          b.className = 'paket-pill'; b.textContent = p.ad;
+          b.onclick = () => paketSec(kod, p.kod);
+          b.dataset.kod = p.kod;
+          paketSatir.appendChild(b);
+        });
+        alanlariCiz([]);            // paket secilene kadar alan yok
+      } else {
+        document.getElementById('paketSatir').style.display = 'none';
+        alanlariCiz(e.alanlar || []);
+      }
+    }
+
+    function paketSec(erpKod, paketKod) {
+      SECILI_PAKET = paketKod;
+      document.querySelectorAll('#paketGrid .paket-pill').forEach(b =>
+        b.classList.toggle('sel', b.dataset.kod === paketKod));
+      const e = ERPLER[erpKod] || {};
+      const p = (e.paketler || []).find(x => x.kod === paketKod);
+      alanlariCiz(p ? p.alanlar : []);
+    }
+
+    function alanlariCiz(alanlar) {
+      const kap = document.getElementById('alanlar');
+      kap.innerHTML = '';
+      (alanlar || []).forEach(a => {
+        const lbl = document.createElement('label');
+        lbl.textContent = a.etiket; kap.appendChild(lbl);
+        if (a.tip === 'sifre') {
+          const sar = document.createElement('div'); sar.className = 'sifre-sar';
+          const inp = document.createElement('input');
+          inp.type = 'password'; inp.dataset.ad = a.ad; inp.className = 'erp-alan';
+          const g = document.createElement('span'); g.className = 'goster'; g.textContent = 'göster';
+          g.onclick = () => { inp.type = inp.type === 'password' ? 'text' : 'password';
+                              g.textContent = inp.type === 'password' ? 'göster' : 'gizle'; };
+          sar.appendChild(inp); sar.appendChild(g); kap.appendChild(sar);
+        } else {
+          const inp = document.createElement('input');
+          inp.type = 'text'; inp.dataset.ad = a.ad; inp.className = 'erp-alan';
+          if (a.ipucu) inp.placeholder = a.ipucu;
+          kap.appendChild(inp);
+        }
+      });
+      const apili = (alanlar || []).length > 0;
+      document.getElementById('testSatir').style.display = apili ? 'block' : 'none';
+      document.getElementById('guvenlikNot').style.display = apili ? 'block' : 'none';
+      document.getElementById('testSonuc').textContent = '';
+      // Dosya/yakinda veya alan secimi tamamsa bitir acik; apili ERP'de de
+      // engellemiyoruz ama test onerilir.
       document.getElementById('bitir').disabled = false;
+    }
+
+    function alanDegerleri() {
+      const b = {};
+      document.querySelectorAll('.erp-alan').forEach(i => {
+        const v = i.value.trim(); if (v) b[i.dataset.ad] = v;
+      });
+      return b;
+    }
+
+    async function baglantiTest() {
+      const btn = document.getElementById('testBtn');
+      const sonuc = document.getElementById('testSonuc');
+      btn.disabled = true; sonuc.style.color = '#94a3b8';
+      sonuc.textContent = 'Test ediliyor…';
+      try {
+        const r = await fetch('/api/erp_test', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ erp_tipi: SECILI_ERP, erp_paket: SECILI_PAKET,
+                                 bilgi: alanDegerleri() }) });
+        const d = await r.json();
+        sonuc.style.color = d.ok ? '#10b981' : '#f43f5e';
+        sonuc.textContent = (d.ok ? '✅ ' : '⚠️ ') + (d.mesaj || '');
+      } catch (e) {
+        sonuc.style.color = '#f43f5e'; sonuc.textContent = '⚠️ Test başarısız: ' + e;
+      }
+      btn.disabled = false;
     }
 
     function ileri() {
@@ -205,6 +332,8 @@
         ofis_adi: document.getElementById('ofis_adi').value.trim(),
         yonetici_ad: document.getElementById('yonetici_ad').value.trim(),
         erp_tipi: SECILI_ERP || 'dosya',
+        erp_paket: SECILI_PAKET || '',
+        bilgi: alanDegerleri(),
       };
       const r = await fetch('/api/kurulum', {
         method: 'POST', headers: {'Content-Type':'application/json'},

@@ -84,6 +84,14 @@
     .durum.ok { color: var(--accent-emerald); }
     .durum.err { color: var(--accent-rose); }
     .bos { text-align:center; color:var(--text-muted); padding:30px; font-size:14px; }
+    .modul-sec { display:flex; gap:8px; flex-wrap:wrap; padding-top:6px; }
+    .modul-sec label { display:inline-flex; align-items:center; gap:6px; font-size:13px;
+      color:var(--text-muted); cursor:pointer; background:rgba(148,163,184,0.08);
+      border:1px solid var(--border-card); border-radius:9px; padding:7px 11px; }
+    .modul-sec input { width:auto; }
+    .b-mod { background: rgba(245,158,11,0.15); color:#fcd34d; cursor:pointer; user-select:none; }
+    .b-mod.kapali { background: rgba(148,163,184,0.10); color:#94a3b8; }
+    .modul-hucre { display:flex; gap:6px; flex-wrap:wrap; }
     @media (max-width: 860px) { .grid { grid-template-columns:1fr; } }
   </style>
 </head>
@@ -107,6 +115,7 @@
         </div>
         <div><label>Giriş e-postası</label><input id="f-eposta" type="email" placeholder="ofis@firma.com"></div>
         <div><label>Geçici parola</label><input id="f-parola" placeholder="en az 4 karakter"></div>
+        <div><label>Modüller (ürünler)</label><div id="f-moduller" class="modul-sec"></div></div>
         <div><button class="btn btn-primary" onclick="kiraciEkle()"><i class="fa-solid fa-plus"></i> Ekle</button></div>
       </div>
       <div class="durum" id="ekle-durum"></div>
@@ -116,7 +125,7 @@
       <h2><i class="fa-solid fa-list"></i> Kiracılar</h2>
       <div class="sub">Her kiracının verisi tamamen izoledir. Pasif yapılan kiracı giriş yapamaz.</div>
       <table>
-        <thead><tr><th>Ünvan</th><th>Tip</th><th>E-posta</th><th>Paket</th><th>Durum</th><th>Oluşturma</th><th>İşlemler</th></tr></thead>
+        <thead><tr><th>Ünvan</th><th>Tip</th><th>E-posta</th><th>Modüller</th><th>Durum</th><th>Oluşturma</th><th>İşlemler</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
       <div class="durum" id="liste-durum"></div>
@@ -124,10 +133,21 @@
   </div>
 
   <script>
+    let MODUL_AD = {};   // {kod: ad} - /api/kiracilar'dan gelir
+
+    function modulFormCiz() {
+      const kutu = document.getElementById('f-moduller');
+      kutu.innerHTML = Object.entries(MODUL_AD).map(([kod, ad]) =>
+        `<label><input type="checkbox" class="f-mod" value="${kod}"${kod === 'ay_kapanis' ? ' checked' : ''}> ${esc(ad)}</label>`
+      ).join('');
+    }
+
     async function yukle() {
       const r = await fetch('/api/kiracilar');
       if (r.status === 401) { window.location.href = '/giris'; return; }
       const d = await r.json();
+      MODUL_AD = d.moduller || {};
+      modulFormCiz();
       const tb = document.getElementById('tbody');
       tb.innerHTML = '';
       if (!d.kiracilar || !d.kiracilar.length) {
@@ -139,6 +159,13 @@
         const tipB = k.tip === 'sirket' ? 'b-sirket' : 'b-ofis';
         const durB = k.aktif ? 'b-aktif' : 'b-pasif';
         const durMetin = k.aktif ? 'Aktif' : 'Pasif';
+        const sahip = new Set(k.moduller || []);
+        // Her modul icin tiklanabilir rozet: acik=sari, kapali=gri. Tiklayinca toggle.
+        const modPills = Object.entries(MODUL_AD).map(([kod, ad]) => {
+          const acik = sahip.has(kod);
+          return `<span class="badge b-mod${acik ? '' : ' kapali'}" title="${acik ? 'Açık — kapatmak için tıkla' : 'Kapalı — açmak için tıkla'}"
+            onclick="modulToggle('${k.id}','${kod}',${acik})">${acik ? '✓ ' : ''}${esc(ad)}</span>`;
+        }).join('');
         const toggle = k.aktif
           ? `<button class="btn btn-sm btn-warn" onclick="durum('${k.id}',false)"><i class="fa-solid fa-pause"></i> Pasif</button>`
           : `<button class="btn btn-sm btn-ok" onclick="durum('${k.id}',true)"><i class="fa-solid fa-play"></i> Aktif</button>`;
@@ -146,7 +173,7 @@
           <td><strong>${esc(k.unvan)}</strong><br><span class="eposta">${k.id}</span></td>
           <td><span class="badge ${tipB}">${esc(k.tip_ad)}</span></td>
           <td class="eposta">${esc(k.eposta)}</td>
-          <td>${esc(k.paket || '-')}</td>
+          <td><div class="modul-hucre">${modPills}</div></td>
           <td><span class="badge ${durB}">${durMetin}</span></td>
           <td class="eposta">${esc(k.olusturma || '-')}</td>
           <td><div class="aksiyon">
@@ -155,6 +182,22 @@
           </div></td>`;
         tb.appendChild(tr);
       });
+    }
+
+    async function modulToggle(id, kod, acik) {
+      // Mevcut listeyi tablo rozetlerinden degil, sunucudan tazeleyip degistir.
+      const r0 = await fetch('/api/kiracilar');
+      const d0 = await r0.json();
+      const k = (d0.kiracilar || []).find(x => x.id === id);
+      if (!k) return;
+      let mods = new Set(k.moduller || []);
+      if (acik) mods.delete(kod); else mods.add(kod);
+      if (mods.size === 0) { durumYaz('liste-durum', 'En az bir modül açık kalmalı.', false); return; }
+      const r = await fetch('/api/kiraci_moduller', { method:'POST',
+        headers:{'Content-Type':'application/json'}, body: JSON.stringify({id, moduller:[...mods]}) });
+      const d = await r.json();
+      if (d.ok) { durumYaz('liste-durum', `${MODUL_AD[kod] || kod} ${acik ? 'kapatıldı' : 'açıldı'}.`, true); yukle(); }
+      else { durumYaz('liste-durum', d.hata || 'Hata.', false); }
     }
 
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g,
@@ -167,11 +210,13 @@
     }
 
     async function kiraciEkle() {
+      const secili = [...document.querySelectorAll('.f-mod:checked')].map(c => c.value);
       const payload = {
         unvan: document.getElementById('f-unvan').value.trim(),
         tip: document.getElementById('f-tip').value,
         eposta: document.getElementById('f-eposta').value.trim(),
         parola: document.getElementById('f-parola').value.trim(),
+        moduller: secili,
       };
       const r = await fetch('/api/kiraci_ekle', { method:'POST',
         headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });

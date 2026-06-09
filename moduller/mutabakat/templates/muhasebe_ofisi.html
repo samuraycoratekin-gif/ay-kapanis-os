@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Muhasebe Ofisi — Aylık Kapanış Panosu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0e1d3d;--yuzey:#172a4d;--yuzey2:#1e3357;--cizgi:rgba(255,255,255,.10);
+    --metin:#f8fafc;--soluk:#94a3b8;
+    --mavi:#14b8a6;--yesil:#10b981;--kirmizi:#f43f5e;--turuncu:#f59e0b;--mor:#6366f1;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter','Segoe UI',-apple-system,Arial,sans-serif;background:
+    radial-gradient(900px 500px at 0% 0%,rgba(20,184,166,.16),transparent 55%),
+    radial-gradient(800px 500px at 100% 0%,rgba(16,185,129,.12),transparent 55%),
+    radial-gradient(700px 500px at 50% 100%,rgba(245,158,11,.06),transparent 55%),var(--bg);
+    color:var(--metin);min-height:100vh;padding:28px clamp(16px,4vw,56px)}
+  .wrap{max-width:1280px;margin:0 auto}
+  header.top{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px;margin-bottom:18px}
+  .ofis{display:flex;align-items:center;gap:14px}
+  .logo{width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,var(--mor),var(--mavi));
+    display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#06101f}
+  h1{font-family:'Outfit',sans-serif;font-size:clamp(19px,3vw,26px);font-weight:800;letter-spacing:-.5px}
+  h1 span{color:var(--mavi)}
+  .alt{color:var(--soluk);font-size:13px;margin-top:3px}
+  .donemkutu{text-align:right;font-size:13px;color:var(--soluk)}
+  .donemkutu select{background:var(--yuzey);color:var(--metin);border:1px solid var(--cizgi);
+    border-radius:9px;padding:8px 12px;font-size:14px;font-weight:700;margin-top:4px;cursor:pointer;outline:none}
+  .donemkutu select:focus{border-color:var(--mor)}
+
+  .kpi{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin:8px 0 22px}
+  @media(max-width:920px){.kpi{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:560px){.kpi{grid-template-columns:repeat(2,1fr)}}
+  .k{background:var(--yuzey);border:1px solid var(--cizgi);border-radius:14px;padding:16px;position:relative;overflow:hidden}
+  .k::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--mor)}
+  .k.g::before{background:var(--yesil)}.k.r::before{background:var(--kirmizi)}
+  .k.o::before{background:var(--turuncu)}.k.b::before{background:var(--mavi)}
+  .k b{display:block;font-size:clamp(20px,3vw,28px);font-weight:800;line-height:1}
+  .k span{color:var(--soluk);font-size:12px;margin-top:6px;display:block}
+
+  .arac{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+  .filtreler{display:flex;gap:6px;flex-wrap:wrap}
+  .ft{background:var(--yuzey);border:1px solid var(--cizgi);color:var(--soluk);padding:8px 16px;
+    border-radius:30px;cursor:pointer;font-size:13px;font-weight:600;transition:.15s}
+  .ft:hover{border-color:var(--mor);color:var(--metin)}
+  .ft.akt{background:var(--mor);border-color:var(--mor);color:#06101f}
+  .ara{margin-left:auto;background:var(--yuzey);border:1px solid var(--cizgi);color:var(--metin);
+    padding:9px 14px;border-radius:10px;font-size:13px;min-width:240px;outline:none}
+  .ara:focus{border-color:var(--mor)}
+
+  .tabkutu{background:var(--yuzey);border:1px solid var(--cizgi);border-radius:14px;overflow:hidden}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:13px 16px;text-align:left;border-bottom:1px solid var(--cizgi);font-size:13.5px;white-space:nowrap}
+  th{color:var(--soluk);font-size:11px;text-transform:uppercase;letter-spacing:.6px;font-weight:700;
+    background:var(--yuzey2);position:sticky;top:0;cursor:pointer;user-select:none}
+  th.nos{cursor:default}
+  th .ok{opacity:.5;font-size:10px}
+  td.sag,th.sag{text-align:right;font-variant-numeric:tabular-nums}
+  td.ort,th.ort{text-align:center}
+  tbody tr{cursor:pointer;transition:.12s}
+  tbody tr:hover{background:rgba(255,255,255,.04)}
+  tbody tr:last-child td{border-bottom:none}
+  .mukbas{font-weight:700}
+  .mukkod{color:var(--soluk);font-size:12px}
+  .sektor{color:var(--soluk);font-size:11.5px;margin-top:2px}
+
+  .sayac{display:inline-flex;gap:5px;align-items:center}
+  .nokta{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;
+    padding:3px 8px;border-radius:20px}
+  .nokta.m{background:rgba(16,185,129,.16);color:#6ee7b7}
+  .nokta.i{background:rgba(244,63,94,.16);color:#fda4af}
+  .nokta.b{background:rgba(139,152,165,.15);color:var(--soluk)}
+
+  .bar{width:120px;height:8px;background:var(--yuzey2);border-radius:20px;overflow:hidden;display:inline-block;vertical-align:middle}
+  .bar i{display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,var(--mavi),var(--yesil))}
+  .oranyaz{font-size:12.5px;font-weight:700;margin-left:8px;vertical-align:middle}
+
+  .pill{display:inline-block;padding:4px 12px;border-radius:30px;font-size:11.5px;font-weight:700}
+  .pill.kapandi{background:rgba(16,185,129,.16);color:#6ee7b7}
+  .pill.devam{background:rgba(245,158,11,.16);color:#fcd34d}
+  .pill.bekliyor{background:rgba(139,152,165,.16);color:var(--soluk)}
+
+  .ac{background:var(--mavi);color:#06101f;border:none;border-radius:9px;padding:8px 15px;
+    font-size:12.5px;font-weight:700;cursor:pointer;transition:.15s}
+  .ac:hover{filter:brightness(1.1)}
+  .tur{font-size:12px;color:var(--soluk)}
+  tfoot td{font-weight:700;background:var(--yuzey2);border-top:2px solid var(--cizgi)}
+  .yokkayit{padding:30px;text-align:center;color:var(--soluk)}
+  .ipucu{color:var(--soluk);font-size:12.5px;margin:14px 2px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="ofis">
+      <div class="logo">A+</div>
+      <div>
+        <h1>ARTI <span>Mali Müşavirlik</span> — Aylık Kapanış Panosu</h1>
+        <div class="alt" id="altyazi">Tüm mükelleflerin mutabakat durumu tek ekranda. Bir mükellefe tıkla, o firmanın cari panosuna geç.</div>
+      </div>
+    </div>
+    <div class="donemkutu">Kapanış Dönemi
+      <br><select id="donem" onchange="donemDegis()">
+        <option>Mayıs 2026</option>
+        <option>Nisan 2026</option>
+        <option>Mart 2026</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="kpi" id="kpi"></div>
+  <div class="arac" id="arac"></div>
+
+  <div class="tabkutu">
+    <table>
+      <thead id="bas"></thead>
+      <tbody id="govde"></tbody>
+      <tfoot id="ayak"></tfoot>
+    </table>
+  </div>
+  <div class="ipucu">💡 Bir satıra ya da “Aç” butonuna tıkladığında o mükellefin <b>cari mutabakat panosu</b> açılır (toplu gönderim, gönderim turları, canlı akış).</div>
+</div>
+
+<script>
+// Muhasebe ofisinin hizmet verdigi mukellefler — her biri ayri bir firma.
+// m=mutabik, i=itirazli, b=bekleyen cari sayisi. durum bunlardan turetilir.
+let MUK=[
+ {kod:"MUK-001",unvan:"Demir Çelik Sanayi A.Ş.",      sektor:"Metal / Üretim",      m:18, i:1, b:1},
+ {kod:"MUK-002",unvan:"Anadolu Tekstil San. Tic.",    sektor:"Tekstil",             m:24, i:0, b:0},
+ {kod:"MUK-003",unvan:"Gül Plastik Ltd. Şti.",        sektor:"Plastik / Ambalaj",   m:9,  i:3, b:2},
+ {kod:"MUK-004",unvan:"Marmara Gıda Sanayi A.Ş.",     sektor:"Gıda",                m:31, i:2, b:4},
+ {kod:"MUK-005",unvan:"Ege Kimya Ltd. Şti.",          sektor:"Kimya",               m:12, i:0, b:0},
+ {kod:"MUK-006",unvan:"Bosphorus İnşaat A.Ş.",        sektor:"İnşaat / Taahhüt",    m:5,  i:1, b:14},
+ {kod:"MUK-007",unvan:"Toros Madencilik Ltd.",        sektor:"Madencilik",          m:7,  i:0, b:0},
+ {kod:"MUK-008",unvan:"Karadeniz Balıkçılık A.Ş.",    sektor:"Su Ürünleri",         m:6,  i:2, b:1},
+ {kod:"MUK-009",unvan:"Akdeniz Turizm İşletmeleri",   sektor:"Turizm",              m:15, i:0, b:3},
+ {kod:"MUK-010",unvan:"Selçuk Otomotiv San. Tic.",    sektor:"Otomotiv Yan Sanayi", m:28, i:1, b:0},
+ {kod:"MUK-011",unvan:"Trakya Cam Sanayi A.Ş.",       sektor:"Cam",                 m:0,  i:0, b:19},
+ {kod:"MUK-012",unvan:"Fırat Enerji A.Ş.",            sektor:"Enerji",              m:22, i:0, b:0},
+ {kod:"MUK-013",unvan:"Konya Un Fabrikası Ltd.",      sektor:"Gıda / Un",           m:11, i:1, b:2},
+ {kod:"MUK-014",unvan:"Bursa Mobilya San. Tic.",      sektor:"Mobilya",             m:8,  i:2, b:0},
+ {kod:"MUK-015",unvan:"Gaziantep Baharat Ltd.",       sektor:"Gıda / Baharat",      m:0,  i:0, b:13},
+];
+
+// durum: KAPANDI (itiraz+bekleyen=0) · DEVAM (yanit basladi, eksik var) · BEKLIYOR (hic yanit yok)
+const cariSay=r=>r.m+r.i+r.b;
+function durum(r){
+  // "baslandi" = en az bir mutabakat gonderilmis. Motor m/i/b'si Excel'den hep
+  // hesaplandigi icin, gonderim yoksa firma "Baslamadi" kabul edilir.
+  if(r.baslandi===false) return "BEKLIYOR";
+  if(r.i===0 && r.b===0) return "KAPANDI";
+  if(r.m===0 && r.i===0) return "BEKLIYOR";
+  return "DEVAM";
+}
+const oran=r=>{const t=cariSay(r); return t? Math.round(r.m/t*100):0;};
+const durumAd={KAPANDI:"Kapandı",DEVAM:"Devam ediyor",BEKLIYOR:"Başlamadı"};
+const sonTarih={ // son hareket — gosterim icin
+ "MUK-001":"03.06.2026","MUK-002":"01.06.2026","MUK-003":"02.06.2026","MUK-004":"03.06.2026",
+ "MUK-005":"30.05.2026","MUK-006":"03.06.2026","MUK-007":"29.05.2026","MUK-008":"02.06.2026",
+ "MUK-009":"01.06.2026","MUK-010":"03.06.2026","MUK-011":"—","MUK-012":"31.05.2026",
+ "MUK-013":"02.06.2026","MUK-014":"03.06.2026","MUK-015":"—"};
+
+let filtre="hepsi", arama="", sira={a:"unvan",yon:1};
+
+function kpiCiz(){
+  const kap=MUK.filter(r=>durum(r)==="KAPANDI").length;
+  const dev=MUK.filter(r=>durum(r)==="DEVAM").length;
+  const bek=MUK.filter(r=>durum(r)==="BEKLIYOR").length;
+  const toplamCari=MUK.reduce((s,r)=>s+cariSay(r),0);
+  const ortOran=MUK.length?Math.round(MUK.reduce((s,r)=>s+oran(r),0)/MUK.length):0;
+  const k=[
+    ["",MUK.length,"toplam mükellef"],
+    ["g",kap,"kapanan dönem"],
+    ["o",dev,"devam eden"],
+    ["r",bek,"başlamadı"],
+    ["b",toplamCari,"toplam cari"],
+    ["g","%"+ortOran,"ort. mutabakat oranı"],
+  ];
+  document.getElementById("kpi").innerHTML=k.map(([c,v,s])=>
+    `<div class="k ${c}"><b>${v}</b><span>${s}</span></div>`).join("");
+}
+
+function aracCiz(){
+  const f=["hepsi","KAPANDI","DEVAM","BEKLIYOR"];
+  const etk={hepsi:"Tümü",KAPANDI:"Kapanan",DEVAM:"Devam eden",BEKLIYOR:"Başlamadı"};
+  document.getElementById("arac").innerHTML=`
+    <div class="filtreler" id="filtreler">
+      ${f.map(x=>`<button class="ft ${filtre===x?'akt':''}" data-f="${x}">${etk[x]}</button>`).join("")}
+    </div>
+    <input class="ara" id="ara" placeholder="🔍 Mükellef ünvanı, kod veya sektör ara…" value="${arama}">`;
+  document.getElementById("filtreler").addEventListener("click",e=>{
+    const b=e.target.closest(".ft"); if(!b)return; filtre=b.dataset.f; ciz();
+  });
+  document.getElementById("ara").addEventListener("input",e=>{arama=e.target.value.trim();tabloCiz();});
+}
+
+function filtreSirala(){
+  let rows=MUK.slice();
+  if(filtre!=="hepsi") rows=rows.filter(r=>durum(r)===filtre);
+  if(arama){const q=arama.toLocaleLowerCase('tr');
+    rows=rows.filter(r=>r.unvan.toLocaleLowerCase('tr').includes(q)||
+      r.kod.toLocaleLowerCase('tr').includes(q)||r.sektor.toLocaleLowerCase('tr').includes(q));}
+  const {a,yon}=sira;
+  rows.sort((x,y)=>{
+    let vx,vy;
+    if(a==="cari"){vx=cariSay(x);vy=cariSay(y);}
+    else if(a==="oran"){vx=oran(x);vy=oran(y);}
+    else if(a==="durum"){vx=durum(x);vy=durum(y);}
+    else{vx=x[a];vy=y[a];}
+    if(typeof vx==="string")return vx.localeCompare(vy,'tr')*yon;
+    return (vx-vy)*yon;
+  });
+  return rows;
+}
+
+function ac(r){
+  const d=document.getElementById("donem").value;
+  location.href=`mutabakat_panosu.html?kod=${encodeURIComponent(r.kod)}&ad=${encodeURIComponent(r.unvan)}`+
+    `&donem=${encodeURIComponent(d)}&m=${r.m}&i=${r.i}&b=${r.b}`;
+}
+
+function tabloCiz(){
+  const rows=filtreSirala();
+  document.getElementById("bas").innerHTML=`<tr>
+     <th data-s="unvan">Mükellef <span class="ok">↕</span></th>
+     <th data-s="sektor">Sektör <span class="ok">↕</span></th>
+     <th class="sag" data-s="cari">Cari <span class="ok">↕</span></th>
+     <th class="nos">Mutabık / İtirazlı / Bekleyen</th>
+     <th data-s="oran">Mutabakat Oranı <span class="ok">↕</span></th>
+     <th data-s="durum">Dönem Durumu <span class="ok">↕</span></th>
+     <th class="ort">Son Hareket</th>
+     <th class="nos ort">İşlem</th></tr>`;
+  baslikSirala();
+  const g=document.getElementById("govde");
+  if(!rows.length){g.innerHTML=`<tr><td colspan="8" class="yokkayit">Kayıt bulunamadı.</td></tr>`;
+    document.getElementById("ayak").innerHTML="";return;}
+  g.innerHTML=rows.map(r=>{
+    const du=durum(r), o=oran(r), t=cariSay(r);
+    const pillCls=du==="KAPANDI"?"kapandi":du==="DEVAM"?"devam":"bekliyor";
+    return `<tr onclick="ac(MUK.find(x=>x.kod==='${r.kod}'))">
+      <td><div class="mukbas">${r.unvan}</div><div class="mukkod">${r.kod}</div></td>
+      <td><span class="sektor">${r.sektor}</span></td>
+      <td class="sag">${t}</td>
+      <td><span class="sayac">
+        <span class="nokta m">✓ ${r.m}</span>
+        <span class="nokta i">! ${r.i}</span>
+        <span class="nokta b">⏳ ${r.b}</span></span></td>
+      <td><span class="bar"><i style="width:${o}%"></i></span><span class="oranyaz">%${o}</span></td>
+      <td><span class="pill ${pillCls}">${durumAd[du]}</span></td>
+      <td class="ort tur">${sonTarih[r.kod]||"—"}</td>
+      <td class="ort"><button class="ac" onclick="event.stopPropagation();ac(MUK.find(x=>x.kod==='${r.kod}'))">Aç →</button></td>
+    </tr>`;
+  }).join("");
+  const tc=rows.reduce((s,r)=>s+cariSay(r),0);
+  const tm=rows.reduce((s,r)=>s+r.m,0);
+  document.getElementById("ayak").innerHTML=
+    `<tr><td colspan="2">TOPLAM (${rows.length} mükellef)</td>
+     <td class="sag">${tc}</td>
+     <td colspan="2">${tm} cari mutabık (%${tc?Math.round(tm/tc*100):0})</td>
+     <td colspan="3"></td></tr>`;
+}
+
+function baslikSirala(){
+  document.querySelectorAll("th[data-s]").forEach(th=>{
+    th.addEventListener("click",()=>{
+      const a=th.dataset.s; sira.yon=sira.a===a?-sira.yon:1; sira.a=a; ciz();
+    });
+  });
+}
+function donemDegis(){
+  document.getElementById("altyazi").textContent=
+    `“${document.getElementById('donem').value}” kapanışı — tüm mükelleflerin mutabakat durumu. Bir mükellefe tıkla, cari panosuna geç.`;
+}
+function ciz(){ kpiCiz(); aracCiz(); tabloCiz(); }
+
+// Sunucudan canli mukellef listesi (varsa). file:// ya da sunucu yoksa gomulu MUK ile devam.
+(async function(){
+  try{
+    const r=await fetch("/api/mukellefler");
+    if(r.ok){const j=await r.json(); if(j&&Array.isArray(j.mukellefler)) MUK=j.mukellefler;}
+  }catch(e){/* sunucuya ulasilamadi: gomulu onizleme verisi ile devam */}
+  ciz();
+})();
+</script>
+</body>
+</html>

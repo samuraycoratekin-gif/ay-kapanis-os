@@ -14,7 +14,7 @@ Moduller henuz placeholder; Asama 1'den itibaren ic dolar.
 
 Calistirma: baslat.bat  (ya da: python app.py)  ->  http://localhost:5050
 """
-import os, sys, json, base64, threading, webbrowser, secrets, http.cookies
+import os, sys, json, base64, threading, webbrowser, secrets, http.cookies, time
 from datetime import datetime
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
@@ -26,7 +26,10 @@ from core import depo
 from core import kiraci
 from core import cari_analiz
 from core import ayarlar
+from core import kasa
+from core import erp_konektor
 from core import moduller as M
+from moduller.mutabakat import app_logic as mutabakat   # gomulu Akilli Mutabakat modulu
 
 M.yukle_hepsi()                      # moduller/ icindeki tum modulleri kaydet
 AKTIF_DONEM = "2026-05"              # varsayilan donem
@@ -43,28 +46,64 @@ STATIC = os.path.join(HERE, "static")
 # --------------------------------------------------------------------------- #
 GIRIS_PAROLASI = os.environ.get("GIRIS_PAROLASI", "")
 BULUT = bool(os.environ.get("PORT"))
-_OTURUMLAR = {}                       # {token: kiraci_id} — gecerli kiraci oturumlari
+
+# --- Oturum suresi (otomatik dusme) ----------------------------------------- #
+# Oturum jetonu -> {kid?, baslangic, son}. Iki sinir: BOSTA (islem yoksa) ve
+# AZAMI (mutlak ust sinir). Gecince jeton dusurulur, yeniden giris istenir.
+OTURUM_BOSTA_SN = int(os.environ.get("OTURUM_BOSTA_SN", 2 * 3600))    # 2 saat islemsizlik
+OTURUM_AZAMI_SN = int(os.environ.get("OTURUM_AZAMI_SN", 12 * 3600))   # 12 saat mutlak
+_OTURUMLAR = {}                       # {token: {"kid":..,"baslangic":ts,"son":ts}}
+
+# --- Giris deneme sinirlama (brute-force korumasi) -------------------------- #
+# IP basina art arda hatali girisler; esik asilinca o IP kisa sure kilitlenir.
+GIRIS_AZAMI_DENEME = int(os.environ.get("GIRIS_AZAMI_DENEME", 8))
+GIRIS_KILIT_SN = int(os.environ.get("GIRIS_KILIT_SN", 300))           # 5 dk kilit
+_GIRIS_DENEME = {}                    # {ip: {"sayi":int, "kilit":ts}}
 
 # Platform sahibi (saglayici): tum kiracilarin ustunde, kayit defterini yonetir.
 # Kimligi env'den gelir; hicbir kiraci bu kapidan giremez. Oturum'u AYRI tutulur
 # ki kiraci veri kapsamina (depo) hic dokunmasin.
 PLATFORM_EPOSTA = os.environ.get("PLATFORM_EPOSTA", "patron@aykapanis.local")
 PLATFORM_PAROLA = os.environ.get("PLATFORM_PAROLA", "patron1234")
-_PLATFORM_OTURUMLAR = set()           # {token} — gecerli platform oturumlari
+_PLATFORM_OTURUMLAR = {}              # {token: {"baslangic":ts,"son":ts}}
+
+
+def _token_al(handler):
+    ck = http.cookies.SimpleCookie(handler.headers.get("Cookie", ""))
+    t = ck.get("oturum")
+    return t.value if t else None
+
+
+def _oturum_suresi_doldu(o, now):
+    return (now - o["son"] > OTURUM_BOSTA_SN) or (now - o["baslangic"] > OTURUM_AZAMI_SN)
 
 
 def _oturum_kiraci(handler):
-    """Istegin cerezindeki token'dan kiraci_id'yi cozer; yoksa None."""
-    ck = http.cookies.SimpleCookie(handler.headers.get("Cookie", ""))
-    t = ck.get("oturum")
-    return _OTURUMLAR.get(t.value) if t else None
+    """Cerezdeki token'dan kiraci_id'yi cozer; suresi dolduysa dusurur -> None."""
+    t = _token_al(handler)
+    o = _OTURUMLAR.get(t) if t else None
+    if not o:
+        return None
+    now = time.time()
+    if _oturum_suresi_doldu(o, now):
+        _OTURUMLAR.pop(t, None)
+        return None
+    o["son"] = now                    # kayan pencere: her erisimde tazele
+    return o["kid"]
 
 
 def _platform_mi(handler):
-    """Istek platform sahibi oturumuna mi ait?"""
-    ck = http.cookies.SimpleCookie(handler.headers.get("Cookie", ""))
-    t = ck.get("oturum")
-    return bool(t and t.value in _PLATFORM_OTURUMLAR)
+    """Istek platform sahibi oturumuna mi ait? (sure kontrollu)"""
+    t = _token_al(handler)
+    o = _PLATFORM_OTURUMLAR.get(t) if t else None
+    if not o:
+        return False
+    now = time.time()
+    if _oturum_suresi_doldu(o, now):
+        _PLATFORM_OTURUMLAR.pop(t, None)
+        return False
+    o["son"] = now
+    return True
 
 
 def _platform_dogrula(eposta, parola):
@@ -78,10 +117,45 @@ def _oturum_gecerli(handler):
     return _oturum_kiraci(handler) is not None
 
 
-def _giris_sayfa(hata=False):
+def _istemci_ip(handler):
+    """Gercek istemci IP'si — Railway/proxy arkasinda X-Forwarded-For ilk deger."""
+    xff = handler.headers.get("X-Forwarded-For", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return handler.client_address[0]
+
+
+def _giris_kilit_kalan(ip, now):
+    """IP kilitliyse kalan saniye; degilse 0."""
+    d = _GIRIS_DENEME.get(ip)
+    if d and d.get("kilit", 0) > now:
+        return int(d["kilit"] - now)
+    return 0
+
+
+def _giris_basarisiz(ip, now):
+    d = _GIRIS_DENEME.setdefault(ip, {"sayi": 0, "kilit": 0})
+    d["sayi"] += 1
+    if d["sayi"] >= GIRIS_AZAMI_DENEME:
+        d["kilit"] = now + GIRIS_KILIT_SN
+        d["sayi"] = 0                  # kilit doldugunda taze say
+
+
+def _giris_basarili(ip):
+    _GIRIS_DENEME.pop(ip, None)
+
+
+def _giris_sayfa(hata=False, kilit=0):
     ofis_adi = ayarlar.oku().get("ofis_adi", "Ay Kapanış OS")
-    uyari = ('<div class="alert-message"><i class="fa-solid fa-circle-exclamation"></i> Şifre hatalı, tekrar deneyin.</div>'
-             if hata else "")
+    if kilit:
+        dk = max(1, (int(kilit) + 59) // 60)
+        uyari = ('<div class="alert-message"><i class="fa-solid fa-lock"></i> '
+                 f'Çok fazla hatalı deneme. Lütfen {dk} dakika sonra tekrar deneyin.</div>')
+    elif hata:
+        uyari = ('<div class="alert-message"><i class="fa-solid fa-circle-exclamation"></i> '
+                 'Şifre hatalı, tekrar deneyin.</div>')
+    else:
+        uyari = ""
     return f"""<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -420,19 +494,19 @@ def _giris_sayfa(hata=False):
     
     <div class="features-section">
       <div class="feature-card">
-        <i class="fa-solid fa-heart-pulse cyan"></i>
-        <h4>13 Denetim</h4>
-        <p>Hatalı bakiye ve vergi uyumsuzluk analizi</p>
+        <i class="fa-solid fa-calendar-check cyan"></i>
+        <h4>Ay Kapanış OS</h4>
+        <p>13 kontrol modülüyle aylık kapanış: mizan, cari, KDV-tevkifat, banka</p>
       </div>
       <div class="feature-card">
-        <i class="fa-solid fa-cloud-arrow-down emerald"></i>
-        <h4>Luca API</h4>
-        <p>Mizan ve fişlerin doğrudan entegrasyonu</p>
+        <i class="fa-solid fa-scale-balanced emerald"></i>
+        <h4>Akıllı Mutabakat</h4>
+        <p>GİB öncelikli 3 aşamalı cari mutabakat ve otomatik fark analizi</p>
       </div>
       <div class="feature-card">
         <i class="fa-solid fa-shield-halved gold"></i>
-        <h4>Güvenli Sunucu</h4>
-        <p>Kilit mekanizması ve rol bazlı onay</p>
+        <h4>Yasal Kanıt & Güvenlik</h4>
+        <p>Hash zincirli değiştirilemez kayıt, rol bazlı onay ve oturum kilidi</p>
       </div>
     </div>
     
@@ -484,9 +558,10 @@ def api_kiracilar():
             "id": k["id"], "unvan": k.get("unvan", ""),
             "tip": tip, "tip_ad": kiraci.TIPLER.get(tip, tip),
             "eposta": k.get("eposta", ""), "paket": k.get("paket", ""),
+            "moduller": kiraci.kiraci_moduller(k["id"]),
             "aktif": bool(k.get("aktif", True)), "olusturma": k.get("olusturma", ""),
         })
-    return {"kiracilar": out, "tipler": kiraci.TIPLER}
+    return {"kiracilar": out, "tipler": kiraci.TIPLER, "moduller": kiraci.MODULLER}
 
 
 def api_kiraci_ekle(body):
@@ -496,16 +571,27 @@ def api_kiraci_ekle(body):
     parola = (body.get("parola") or "").strip()
     tip = body.get("tip") or "ofis"
     paket = (body.get("paket") or "pilot").strip() or "pilot"
+    moduller = body.get("moduller")   # ["ay_kapanis","mutabakat"] - bos ise varsayilan
     if not unvan:
         return {"hata": "Ünvan zorunlu."}
     if len(parola) < 4:
         return {"hata": "Parola en az 4 karakter olmalı."}
     try:
-        k = kiraci.kiraci_ekle(unvan, eposta, parola, tip=tip, paket=paket)
+        k = kiraci.kiraci_ekle(unvan, eposta, parola, tip=tip, paket=paket,
+                               moduller=moduller)
     except ValueError as e:
         return {"hata": str(e)}
     return {"ok": True, "kiraci": {"id": k["id"], "unvan": k["unvan"],
-                                   "eposta": k["eposta"], "tip": k["tip"]}}
+                                   "eposta": k["eposta"], "tip": k["tip"],
+                                   "moduller": kiraci.kiraci_moduller(k["id"])}}
+
+
+def api_kiraci_moduller(body):
+    """Kiracinin sahip oldugu modulleri gunceller (capraz satis: mutabakat'i ac/kapa)."""
+    k = kiraci.kiraci_moduller_ayarla(body.get("id"), body.get("moduller") or [])
+    if not k:
+        return {"hata": "Kiracı bulunamadı."}
+    return {"ok": True, "moduller": kiraci.kiraci_moduller(k["id"])}
 
 
 def api_kiraci_durum(body):
@@ -529,25 +615,18 @@ def api_kiraci_parola(body):
 
 # --------------------------------------------------------------------------- #
 # Kurulum (onboarding) - yeni kiracinin ilk girisinde calisir.
-# Desteklenen ERP'ler ve onerilen baglama yontemi. Gercek konektorler (Parasut
-# OAuth vb.) ayri asamada gelir; suan "dosya" ile herkes hemen baslayabilir.
+# Desteklenen ERP'ler, baglanti alan semasi ve baglanti testi core/erp_konektor
+# icinde merkezilestirildi. ERP = motora veri besleyen baska bir kaynak.
 # --------------------------------------------------------------------------- #
-ERP_SECENEKLERI = {
-    "parasut": {"ad": "Paraşüt", "yontem": "oauth"},
-    "logo":    {"ad": "Logo (Tiger / GO)", "yontem": "oauth"},
-    "mikro":   {"ad": "Mikro", "yontem": "oauth"},
-    "netsis":  {"ad": "Netsis", "yontem": "oauth"},
-    "luca":    {"ad": "Luca", "yontem": "dosya"},
-    "dosya":   {"ad": "Dosya Yükleme (Excel / CSV)", "yontem": "dosya"},
-}
 # Baglama yontemi insan-okunur aciklamasi (sihirbazda gosterilir).
 BAGLANTI_ACIKLAMA = {
-    "oauth": "API/OAuth bağlantısı yakında. Şifreniz bizde saklanmaz; "
-             "şimdilik mizan/dosya yükleyerek hemen başlayabilirsiniz.",
-    "anahtar": "ERP panelinizden ürettiğiniz API anahtarını yapıştırırsınız; "
-               "anahtar şifreli saklanır, asıl parolanız bizde tutulmaz.",
-    "dosya": "Mizan/Excel/CSV dosyalarını yükleyerek çalışırsınız — en hızlı "
-             "ve en güvenli başlangıç, ek bağlantı gerekmez.",
+    "api": "Luca/saglayicidan aldiginiz baglanti bilgilerini girersiniz; "
+           "sifre/secret SIFRELI saklanir, asla geri gosterilmez, koda/git'e gitmez.",
+    "oauth": "Saglayici yetki ekranindan baglanirsiniz; sifreniz bizde tutulmaz.",
+    "yakinda": "Bu programin otomatik baglantisi yakinda. Su an Dosya Yukleme ile "
+               "hemen baslayabilirsiniz.",
+    "dosya": "Mizan/Excel/CSV dosyalarini yukleyerek calisirsiniz — en hizli "
+             "ve en guvenli baslangic, ek baglanti gerekmez.",
 }
 
 
@@ -558,39 +637,69 @@ def _kurulum_gerekli():
 
 
 def api_kurulum_bilgi():
-    """Sihirbaz icin kiraci bilgisi + ERP secenekleri."""
+    """Sihirbaz icin kiraci bilgisi + ERP secenekleri (alan semasiyla)."""
     k = kiraci.kiraci_getir(depo.aktif_kiraci()) or {}
     tip = k.get("tip", "ofis")
     return {
         "tip": tip,
         "tip_ad": kiraci.TIPLER.get(tip, "Ofis"),
         "unvan": k.get("unvan", ""),
-        "erp_secenekleri": [{"kod": kk, "ad": v["ad"], "yontem": v["yontem"]}
-                            for kk, v in ERP_SECENEKLERI.items()],
+        "erp_secenekleri": erp_konektor.semalar_listesi(),
         "baglanti_aciklama": BAGLANTI_ACIKLAMA,
     }
 
 
+def _erp_bilgi_ayir(erp, paket, bilgi):
+    """Girilen baglanti alanlarini SIR (sifrelenecek) ve OZET (gosterilebilir)
+    olarak ayirir. Sir alanlar kasa ile sifrelenir, ozet duz saklanir."""
+    bilgi = bilgi or {}
+    sir_adlar = erp_konektor.sir_alanlari(erp, paket)
+    ozet, sir = {}, {}
+    for ad, deger in bilgi.items():
+        if ad in sir_adlar:
+            sir[ad] = deger
+        else:
+            ozet[ad] = deger
+    sifreli = kasa.sifrele(json.dumps(sir, ensure_ascii=False)) if sir else ""
+    return ozet, sifreli
+
+
+def api_erp_test(body):
+    """Kurulum sirasinda 'Baglantiyi Test Et' — endpoint'e gercek erisim denemesi."""
+    erp = (body.get("erp_tipi") or "").strip()
+    paket = (body.get("erp_paket") or "").strip() or None
+    bilgi = body.get("bilgi") or {}
+    return erp_konektor.baglanti_test(erp, paket, bilgi)
+
+
 def api_kurulum(body):
-    """Yeni kiracinin tek-seferlik kurulumu: ofis adi + yonetici + ERP secimi.
+    """Yeni kiracinin tek-seferlik kurulumu: ofis adi + yonetici + ERP + baglanti.
     Yalniz henuz hic kullanici yokken calisir (tekrar calismaz)."""
     if depo.kullanicilari_getir():
         return {"hata": "Kurulum zaten tamamlanmış."}
     ofis_adi = (body.get("ofis_adi") or "").strip()
     yonetici_ad = (body.get("yonetici_ad") or "").strip()
     erp = body.get("erp_tipi") or "dosya"
+    paket = (body.get("erp_paket") or "").strip()
+    bilgi = body.get("bilgi") or {}
     if not yonetici_ad:
         return {"hata": "Yönetici adı zorunlu."}
-    if erp not in ERP_SECENEKLERI:
-        erp = "dosya"
+    sema = erp_konektor.SEMALAR.get(erp)
+    if not sema:
+        erp, sema = "dosya", erp_konektor.SEMALAR["dosya"]
     # Ilk yoneticiyi ac ve aktif kullanici yap.
     k = depo.kullanici_ekle(yonetici_ad, "yonetici")
     depo.aktif_kullanici_ayarla(k["id"])
+    # Baglanti bilgisini SIR/OZET olarak ayir, siri sifrele.
+    ozet, sifreli = _erp_bilgi_ayir(erp, paket or None, bilgi)
     # Kiraci-izole ayarlara kurulum bilgisini yaz.
     yeni = dict(ayarlar.oku())
     yeni["ofis_adi"] = ofis_adi or yeni.get("ofis_adi", "Ay Kapanış OS")
     yeni["erp_tipi"] = erp
-    yeni["erp_baglanti"] = ERP_SECENEKLERI[erp]["yontem"]
+    yeni["erp_paket"] = paket
+    yeni["erp_baglanti"] = sema["yontem"]
+    yeni["erp_baglanti_ozet"] = ozet
+    yeni["erp_kimlik_sifreli"] = sifreli
     yeni["kurulum_tamam"] = True
     ayarlar.yaz(yeni)
     return {"ok": True}
@@ -606,7 +715,26 @@ def api_ofis(donem=None):
         bulgu = sum(x.get("bulgu_sayisi", 0) for x in d["moduller"].values())
         out.append({**m, "genel_ilerleme": d["genel_ilerleme"],
                     "bulgu": bulgu, "son_tarih": d.get("son_tarih")})
-    return {"donem": donem, "donemler": DONEMLER, "musteriler": out}
+    # Bu kiracinin sahip oldugu URUN modulleri (ay_kapanis/mutabakat) - sekme gosterimi icin.
+    urun_kodlar = kiraci.kiraci_moduller(depo.aktif_kiraci())
+    return {"donem": donem, "donemler": DONEMLER, "musteriler": out,
+            "urun_moduller": urun_kodlar,
+            "urun_modul_adlar": {k: kiraci.MODULLER[k] for k in urun_kodlar}}
+
+
+# Platforma gercekten bagli (calisir) urun modulleri. Digerleri "yakinda" placeholder.
+HAZIR_URUNLER = {"ay_kapanis", "mutabakat"}
+URUN_URL = {"ay_kapanis": "/ay-kapanis", "mutabakat": "/mutabakat/ofis"}
+
+
+def api_urunler():
+    """Aktif kiracinin sahip oldugu urun modulleri (giris sonrasi secim ekrani)."""
+    kodlar = kiraci.kiraci_moduller(depo.aktif_kiraci())
+    a = ayarlar.oku()
+    urunler = [{"kod": k, "ad": kiraci.MODULLER.get(k, k),
+                "hazir": k in HAZIR_URUNLER, "url": URUN_URL.get(k, "")}
+               for k in kodlar]
+    return {"ofis_adi": a.get("ofis_adi", "Ay Kapanış OS"), "urunler": urunler}
 
 
 def api_kokpit(musteri_id, donem):
@@ -1032,10 +1160,14 @@ class Handler(BaseHTTPRequestHandler):
     def _gonder(self, data, ctype="application/json; charset=utf-8", code=200):
         if isinstance(data, (dict, list)):
             data = json.dumps(data, ensure_ascii=False)
-        data = data.encode("utf-8")
+        if not isinstance(data, (bytes, bytearray)):
+            data = data.encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
+        # Bu yanitlarin hepsi dinamik (HTML sayfa + API JSON); tarayici onbellege
+        # almamali — yoksa eski sablon/sema gosterilir.
+        self.send_header("Cache-Control", "no-store, must-revalidate")
         self.end_headers()
         self.wfile.write(data)
 
@@ -1058,14 +1190,15 @@ class Handler(BaseHTTPRequestHandler):
         try:
             # --- Giris kapisi: /giris, /cikis ve /static disinda her sey oturum ister ---
             if p == "/giris":
-                return self._gonder(_giris_sayfa(hata=bool(q.get("hata"))),
+                kalan = _giris_kilit_kalan(_istemci_ip(self), time.time()) if q.get("kilit") else 0
+                return self._gonder(_giris_sayfa(hata=bool(q.get("hata")), kilit=kalan),
                                     "text/html; charset=utf-8")
             if p == "/cikis":
                 ck = http.cookies.SimpleCookie(self.headers.get("Cookie", ""))
                 t = ck.get("oturum")
                 if t:
                     _OTURUMLAR.pop(t.value, None)
-                    _PLATFORM_OTURUMLAR.discard(t.value)
+                    _PLATFORM_OTURUMLAR.pop(t.value, None)
                 return self._yonlendir("/giris")
             # --- Platform kapisi: kiraci-disi; kiraci gate'inden ONCE ele alinir ---
             if p == "/yonetim" or p.startswith("/api/kiraci"):
@@ -1091,8 +1224,22 @@ class Handler(BaseHTTPRequestHandler):
             if p in ("/", "/index.html"):
                 if _kurulum_gerekli():
                     return self._yonlendir("/kurulum")
+                # Kiraci birden fazla urune sahipse once urun secim ekranini goster.
+                if len(kiraci.kiraci_moduller(depo.aktif_kiraci())) >= 2:
+                    return self._gonder(_dosya_oku(os.path.join(TPL, "urun_secim.html")),
+                                        "text/html; charset=utf-8")
+                return self._yonlendir("/ay-kapanis")
+            if p in ("/ay-kapanis", "/ay-kapanis.html"):
+                if _kurulum_gerekli():
+                    return self._yonlendir("/kurulum")
                 return self._gonder(_dosya_oku(os.path.join(TPL, "ofis_panosu.html")),
                                     "text/html; charset=utf-8")
+            if p == "/mutabakat" or p.startswith("/mutabakat/"):
+                if "mutabakat" not in kiraci.kiraci_moduller(depo.aktif_kiraci()):
+                    return self._yonlendir("/")
+                sub = p[len("/mutabakat"):]   # "" | "/ofis" | "/api/yukle" ...
+                kod, ctype, govde = mutabakat.dispatch_get(sub, q, _istemci_ip(self))
+                return self._gonder(govde, ctype, kod)
             if p == "/kurulum":
                 if not _kurulum_gerekli():
                     return self._yonlendir("/")
@@ -1126,6 +1273,8 @@ class Handler(BaseHTTPRequestHandler):
                     ctype = "text/css" if ad.endswith(".css") else "application/octet-stream"
                     return self._gonder(_dosya_oku(yol), ctype + "; charset=utf-8")
                 return self._gonder({"hata": "bulunamadi"}, code=404)
+            if p == "/api/urunler":
+                return self._gonder(api_urunler())
             if p == "/api/ofis":
                 return self._gonder(api_ofis((q.get("d") or [None])[0]))
             if p == "/api/kokpit":
@@ -1153,20 +1302,53 @@ class Handler(BaseHTTPRequestHandler):
         ham = self.rfile.read(n)
         # --- Giris formu (urlencoded), JSON'dan ONCE ele alinir ---
         if p == "/giris":
+            now = time.time()
+            ip = _istemci_ip(self)
+            if _giris_kilit_kalan(ip, now):
+                return self._yonlendir("/giris?kilit=1")
             params = parse_qs(ham.decode("utf-8", "replace"))
             eposta = (params.get("eposta") or [""])[0]
             parola = (params.get("parola") or [""])[0]
             # Once platform sahibi kimligi denenir; degilse kiraci girisi.
             if _platform_dogrula(eposta, parola):
+                _giris_basarili(ip)
                 t = secrets.token_urlsafe(32)
-                _PLATFORM_OTURUMLAR.add(t)
+                _PLATFORM_OTURUMLAR[t] = {"baslangic": now, "son": now}
                 return self._oturum_kur(t, "/yonetim")
             k = kiraci.dogrula(eposta, parola)
             if k:
+                _giris_basarili(ip)
                 t = secrets.token_urlsafe(32)
-                _OTURUMLAR[t] = k["id"]
+                _OTURUMLAR[t] = {"kid": k["id"], "baslangic": now, "son": now}
                 return self._oturum_kur(t, "/")
+            _giris_basarisiz(ip, now)
             return self._yonlendir("/giris?hata=1")
+        # --- Veri geri yukleme (platform sahibi): lokal veri/ -> bulut volume ---
+        # Govde JSON degil ZIP; json.loads'tan ONCE ele alinir. Zip-slip korumali,
+        # uygulama oncesi mevcut /data otomatik yedeklenir (geri donulebilir).
+        if p == "/api/veri_geri_yukle":
+            if not _platform_mi(self):
+                return self._gonder({"hata": "Platform yetkisi gerekli.", "giris": True}, code=401)
+            try:
+                import io, zipfile, shutil
+                kok = os.path.abspath(depo.ROOT_VERI)
+                zf = zipfile.ZipFile(io.BytesIO(ham))
+                adlar = zf.namelist()
+                for ad in adlar:
+                    hedef = os.path.abspath(os.path.join(kok, ad))
+                    if hedef != kok and not hedef.startswith(kok + os.sep):
+                        return self._gonder({"hata": f"Guvensiz yol: {ad}"}, code=400)
+                yedek = kok.rstrip("/\\") + "_yedek_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+                if os.path.isdir(kok) and os.listdir(kok):
+                    shutil.copytree(kok, yedek, dirs_exist_ok=True)
+                else:
+                    yedek = None
+                zf.extractall(kok)
+                return self._gonder({"ok": True, "dosya": len(adlar),
+                                     "yedek": os.path.basename(yedek) if yedek else None})
+            except Exception as e:
+                _hata_logla("POST /api/veri_geri_yukle", e)
+                return self._gonder({"hata": str(e)}, code=500)
         body = json.loads(ham or b"{}")
         # --- Platform yonetim POST'lari: kiraci gate'inden ONCE ---
         if p.startswith("/api/kiraci"):
@@ -1179,6 +1361,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self._gonder(api_kiraci_durum(body))
                 if p == "/api/kiraci_parola":
                     return self._gonder(api_kiraci_parola(body))
+                if p == "/api/kiraci_moduller":
+                    return self._gonder(api_kiraci_moduller(body))
             except Exception as e:
                 _hata_logla(f"POST {p}", e)
                 return self._gonder({"hata": str(e)}, code=500)
@@ -1187,9 +1371,18 @@ class Handler(BaseHTTPRequestHandler):
         if kid is None:
             return self._gonder({"hata": "Oturum gerekli.", "giris": True}, code=401)
         depo.kiraci_ayarla(kid)             # bu istegin tum veri erisimi bu kiraciya kapsanir
+        if p.startswith("/mutabakat/"):
+            if "mutabakat" not in kiraci.kiraci_moduller(depo.aktif_kiraci()):
+                return self._gonder({"hata": "Bu modül kiracıda etkin değil."}, code=403)
+            ua = self.headers.get("User-Agent", "")
+            kod, ctype, govde = mutabakat.dispatch_post(p[len("/mutabakat"):], body,
+                                                        _istemci_ip(self), ua)
+            return self._gonder(govde, ctype, kod)
         try:
             if p == "/api/kurulum":
                 return self._gonder(api_kurulum(body))
+            if p == "/api/erp_test":
+                return self._gonder(api_erp_test(body))
             if p == "/api/musteri_ekle":
                 return self._gonder(api_musteri_ekle(body))
             if p == "/api/yukle":

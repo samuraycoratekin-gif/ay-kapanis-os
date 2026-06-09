@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mutabakat Yanıt Portalı — Karşı Taraf</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0e1d3d;--yuzey:#172a4d;--yuzey2:#1e3357;--cizgi:rgba(255,255,255,.10);
+    --metin:#f8fafc;--soluk:#94a3b8;
+    --mavi:#14b8a6;--yesil:#10b981;--kirmizi:#f43f5e;--turuncu:#f59e0b;--mor:#6366f1;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter','Segoe UI',-apple-system,Arial,sans-serif;background:
+    radial-gradient(800px 500px at 0% 0%,rgba(20,184,166,.16),transparent 55%),
+    radial-gradient(700px 500px at 100% 0%,rgba(16,185,129,.12),transparent 55%),var(--bg);
+    color:var(--metin);min-height:100vh;padding:30px clamp(16px,4vw,40px)}
+  .wrap{max-width:880px;margin:0 auto}
+  .ust{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:6px}
+  .rozet{background:rgba(20,184,166,.14);color:#7fe0d6;font-size:12px;font-weight:700;
+    padding:6px 13px;border-radius:30px;display:inline-block;margin-bottom:14px}
+  h1{font-size:clamp(20px,3vw,27px);font-weight:800;letter-spacing:-.5px}
+  h1 span{color:var(--mavi)}
+  .alt{color:var(--soluk);font-size:13.5px;margin-top:5px;line-height:1.5}
+  .kutu{background:var(--yuzey);border:1px solid var(--cizgi);border-radius:16px;padding:22px 24px;margin-top:18px}
+  .gonderen{font-size:13px;color:var(--soluk);text-align:right;line-height:1.5}
+  .gonderen b{color:var(--metin)}
+
+  table.bk{width:100%;border-collapse:collapse;margin:6px 0 4px}
+  table.bk td{padding:11px 6px;border-bottom:1px solid var(--cizgi);font-size:14px}
+  table.bk td.sag{text-align:right;font-variant-numeric:tabular-nums}
+  table.bk tr.vur td{font-weight:800;color:var(--turuncu);border-bottom:none}
+  .basl{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--soluk);font-weight:700;margin-bottom:6px}
+
+  .secenekler{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+  @media(max-width:560px){.secenekler{grid-template-columns:1fr}}
+  .sec{border:1.5px solid var(--cizgi);border-radius:12px;padding:16px;cursor:pointer;transition:.15s;background:var(--bg)}
+  .sec:hover{border-color:var(--mavi)}
+  .sec.aktif.evet{border-color:var(--yesil);background:rgba(16,185,129,.08)}
+  .sec.aktif.hayir{border-color:var(--kirmizi);background:rgba(244,63,94,.08)}
+  .sec .bas{font-weight:800;font-size:15px;margin-bottom:5px}
+  .sec.evet .bas{color:#6ee7b7}.sec.hayir .bas{color:#fda4af}
+  .sec .ac{font-size:12.5px;color:var(--soluk);line-height:1.45}
+
+  .yukle{margin-top:16px;display:none}
+  .yukle.acik{display:block;animation:gir .25s ease}
+  @keyframes gir{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+  .yukle label{font-size:13px;color:var(--soluk);display:block;margin-bottom:8px}
+  .drop{border:1.5px dashed var(--cizgi);border-radius:12px;padding:18px;text-align:center;background:var(--bg)}
+  .drop input{display:block;margin:8px auto 0;color:var(--soluk);font-size:13px}
+  .btn{border:none;border-radius:10px;padding:12px 22px;font-size:14px;font-weight:700;cursor:pointer;transition:.15s;margin-top:14px}
+  .btn.pri{background:var(--mavi);color:#06101f}.btn.pri:hover{filter:brightness(1.1)}
+  .btn.pri:disabled{opacity:.5;cursor:not-allowed}
+  .btn.yesil{background:var(--yesil);color:#06140b}
+
+  .calisiyor{display:none;text-align:center;padding:30px 0}
+  .calisiyor.acik{display:block}
+  .spin{width:42px;height:42px;border:4px solid var(--cizgi);border-top-color:var(--mavi);
+    border-radius:50%;margin:0 auto 14px;animation:don 1s linear infinite}
+  @keyframes don{to{transform:rotate(360deg)}}
+  .adimlar{color:var(--soluk);font-size:13px;line-height:1.9;margin-top:8px}
+  .adimlar .ok{color:var(--yesil)}
+
+  .sonuc{display:none}
+  .sonuc.acik{display:block;animation:gir .3s ease}
+  .ozetbar{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px}
+  .oz{flex:1;min-width:120px;background:var(--yuzey2);border-radius:12px;padding:14px;border:1px solid var(--cizgi)}
+  .oz b{display:block;font-size:24px;font-weight:800}
+  .oz span{color:var(--soluk);font-size:12px}
+  .oz.r b{color:#fda4af}.oz.o b{color:#fcd34d}.oz.b b{color:#7fe0d6}
+  .gruplar{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:720px){.gruplar{grid-template-columns:1fr}}
+  .grup{background:var(--bg);border:1px solid var(--cizgi);border-radius:12px;padding:15px}
+  .grup .gb{font-weight:800;font-size:13px;margin-bottom:10px}
+  .grup.siz .gb{color:#fda4af}.grup.biz .gb{color:#fcd34d}.grup.fark .gb{color:#7fe0d6}
+  .eks{border-left:3px solid var(--cizgi);padding:9px 11px;border-radius:8px;background:var(--yuzey2);
+    font-size:12.5px;line-height:1.5;margin-bottom:8px}
+  .grup.siz .eks{border-left-color:var(--kirmizi)}
+  .grup.biz .eks{border-left-color:var(--turuncu)}
+  .grup.fark .eks{border-left-color:var(--mavi)}
+  .eksbos{color:var(--soluk);opacity:.55;font-size:12.5px}
+  .kapanis{margin-top:18px;background:rgba(20,184,166,.08);border:1px solid rgba(20,184,166,.25);
+    border-radius:12px;padding:16px;font-size:13.5px;line-height:1.6;color:#cfdbe8}
+  .kapanis b{color:#fff}
+  .mutabikkutu{display:none;text-align:center;padding:26px;margin-top:18px;
+    background:rgba(16,185,129,.10);border:1px solid rgba(16,185,129,.3);border-radius:14px}
+  .mutabikkutu.acik{display:block}
+  .mutabikkutu .big{font-size:18px;font-weight:800;color:#6ee7b7;margin-bottom:6px}
+
+  /* --- Yenilenen gorunum --- */
+  .topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+    background:linear-gradient(120deg,rgba(20,184,166,.14),rgba(99,102,241,.10));
+    border:1px solid var(--cizgi);border-radius:16px;padding:16px 20px;margin-bottom:18px}
+  .brand{display:flex;align-items:center;gap:13px}
+  .logo{width:44px;height:44px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;
+    justify-content:center;font-size:22px;font-weight:900;color:#06101f;
+    background:linear-gradient(135deg,#14b8a6,#6366f1);box-shadow:0 6px 18px rgba(20,184,166,.35)}
+  .brand .ad{font-size:17px;font-weight:800;letter-spacing:-.3px;line-height:1.1}
+  .brand .ad span{color:var(--mavi)}
+  .brand .sl{font-size:11.5px;color:var(--soluk);margin-top:2px}
+  .meta{text-align:right;font-size:12px;color:var(--soluk);line-height:1.6}
+  .meta b{color:var(--metin)}
+  .meta .fno{display:inline-block;margin-top:3px;background:var(--yuzey2);border:1px solid var(--cizgi);
+    padding:2px 9px;border-radius:20px;font-size:11px;color:#7fe0d6}
+
+  .doc{background:linear-gradient(180deg,var(--yuzey),#121821);border:1px solid var(--cizgi);
+    border-radius:18px;padding:0;overflow:hidden;margin-top:18px}
+  .doc .head{padding:20px 24px 16px;border-bottom:1px solid var(--cizgi)}
+  .doc .head .saygi{font-size:18px;font-weight:800;letter-spacing:-.3px}
+  .doc .head .ack{font-size:12.8px;color:var(--soluk);margin-top:4px;line-height:1.5}
+  .doc .body{padding:18px 24px 22px}
+
+  .bkkart{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:12px;margin:4px 0 16px}
+  @media(max-width:620px){.bkkart{grid-template-columns:1fr}}
+  .bkh{background:var(--bg);border:1px solid var(--cizgi);border-radius:13px;padding:15px 16px}
+  .bkh .et{font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--soluk);font-weight:700}
+  .bkh .vl{font-size:21px;font-weight:800;margin-top:7px;font-variant-numeric:tabular-nums}
+  .bkh.fark{background:linear-gradient(135deg,rgba(245,158,11,.16),rgba(245,158,11,.05));
+    border-color:rgba(245,158,11,.45)}
+  .bkh.fark .vl{color:#fcd34d}
+  .bkh.fark.sifir{background:linear-gradient(135deg,rgba(16,185,129,.16),rgba(16,185,129,.05));
+    border-color:rgba(16,185,129,.45)}
+  .bkh.fark.sifir .vl{color:#6ee7b7}
+  .bkh .vl .bekl{font-size:13px;font-weight:600;color:var(--soluk);opacity:.7;
+    font-style:italic;letter-spacing:0}
+  .durozet{font-size:12.5px;color:var(--soluk);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .durozet .nokta{width:9px;height:9px;border-radius:50%;background:var(--turuncu);flex-shrink:0}
+  .durozet.sifir .nokta{background:var(--yesil)}
+
+  .dipnot{margin-top:22px;padding:14px 18px;border-top:1px solid var(--cizgi);
+    font-size:10.5px;line-height:1.65;color:#6f7d8c}
+  .dipnot b{color:#94a3b8;font-weight:700}
+  .footer{margin-top:14px;text-align:center;font-size:11px;color:#5a6672;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">M</div>
+      <div>
+        <div class="ad">Mutabakat <span>AI</span></div>
+        <div class="sl">🔗 Giriş gerektirmeyen güvenli mutabakat bağlantısı</div>
+      </div>
+    </div>
+    <div class="meta">
+      Gönderen <b id="gonderenAd">ÖRNEK SANAYİ A.Ş.</b><br>
+      Dönem: <b>Mayıs 2026</b><br>
+      <span class="fno" id="formno">Form No: —</span>
+    </div>
+  </div>
+
+  <!-- ADIM 1: bakiye + secim -->
+  <div class="kutu" id="adim1">
+    <div class="doc">
+      <div class="head">
+        <div class="saygi" id="sayin">Yükleniyor…</div>
+        <div class="ack"><span id="ackFirma">ÖRNEK SANAYİ A.Ş.</span> defter kayıtlarına göre <b>Mayıs 2026</b> dönemi cari hesap
+          durumunuz aşağıdadır. Lütfen kontrol edip yanıtınızı bildirin.</div>
+      </div>
+      <div class="body">
+        <div class="durozet" id="durozet"><span class="nokta"></span><span id="duroz_yazi">Bakiyeler arasında fark bulunuyor.</span></div>
+        <div class="bkkart">
+          <div class="bkh">
+            <div class="et">Gönderene Göre Bakiyeniz</div>
+            <div class="vl" id="b_bizim">—</div>
+          </div>
+          <div class="bkh">
+            <div class="et">Sizin Bildirdiğiniz</div>
+            <div class="vl" id="b_karsi">—</div>
+          </div>
+          <div class="bkh fark" id="farkkart">
+            <div class="et">Fark</div>
+            <div class="vl" id="b_fark">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="secenekler">
+      <div class="sec evet" id="sec_evet" onclick="secim('evet')">
+        <div class="bas">✓ MUTABIKIZ</div>
+        <div class="ac">Bakiye kayıtlarımızla uyumludur. Onaylıyoruz.</div>
+      </div>
+      <div class="sec hayir" id="sec_hayir" onclick="secim('hayir')">
+        <div class="bas">✕ MUTABIK DEĞİLİZ</div>
+        <div class="ac">Bakiye kayıtlarımızla uyuşmuyor. Kendi ekstremizi yüklüyoruz.</div>
+      </div>
+    </div>
+
+    <div class="yukle" id="yuklealani">
+      <label>Kendi cari ekstrenizi yükleyin (Excel) — sistem GİB + akıllı zincirle farkları otomatik çıkarır:</label>
+      <div class="drop">
+        📄 Ekstre dosyanızı seçin
+        <input type="file" id="dosya" accept=".xlsx,.xlsm,.pdf" onchange="dosyaSecildi()">
+        <div id="ornekipucu" style="font-size:11.5px;color:var(--soluk);margin-top:8px"></div>
+      </div>
+      <button class="btn pri" id="calisbtn" disabled onclick="calistir()">⚙️ Ekstreyi Yükle ve Karşılaştır</button>
+    </div>
+
+    <div class="mutabikkutu" id="mutabikkutu">
+      <div class="big">✓ Mutabakat onayınız alındı</div>
+      <div style="color:var(--soluk);font-size:13.5px">Yanıtınız gönderen firmanın ekranına “Mutabık 🔒” olarak düştü. Teşekkürler.</div>
+    </div>
+  </div>
+
+  <!-- ADIM 2: program calisiyor -->
+  <div class="kutu calisiyor" id="adim2">
+    <div class="spin"></div>
+    <div style="font-weight:700">Ekstreniz okunuyor, iki taraf karşılaştırılıyor…</div>
+    <div class="adimlar" id="adimlar"></div>
+  </div>
+
+  <!-- ADIM 3: sonuc -->
+  <div class="kutu sonuc" id="adim3">
+    <div class="basl">Karşılaştırma Sonucu — eksikler iki taraf için ayrı ayrı</div>
+    <div class="ozetbar" id="ozetbar"></div>
+    <div class="gruplar" id="gruplar"></div>
+    <div class="kapanis" id="kapanis"></div>
+    <div style="text-align:center"><button class="btn pri" onclick="tekrar()">↻ Baştan dene</button></div>
+  </div>
+
+  <div class="dipnot">
+    (<b>Hukuki bilgi:</b> Bu portal üzerinden verilen “Mutabıkız” / “Mutabık Değiliz” yanıtları,
+    <b>TTK m.94</b> ve <b>HMK m.199</b> çerçevesinde yazılı mutabakat ve belge/delil niteliği taşır.
+    Onay anında e-posta ile kimlik doğrulama (OTP), erişim/işlem zaman kayıtları ve değişmezliği
+    <b>SHA-256</b> zinciriyle korunan delil günlüğü tutulur. Kesin delil gücü için tarafların ana
+    sözleşmesine bu platformu yetkili mutabakat aracı olarak tanıyan bir madde eklenmesi önerilir.
+    Bu metin hukuki danışmanlık yerine geçmez.)
+  </div>
+  <div class="footer">Mutabakat AI · Güvenli mutabakat altyapısı</div>
+</div>
+
+<!-- OTP dogrulama modali (mail acikken gosterilir) -->
+<div id="otpKat" style="display:none;position:fixed;inset:0;background:rgba(8,15,30,.62);
+    z-index:50;align-items:center;justify-content:center">
+  <div style="background:#fff;color:#1a2230;width:min(420px,92vw);border-radius:16px;
+      padding:26px 24px;box-shadow:0 24px 70px rgba(0,0,0,.4);font-family:inherit">
+    <div style="font-size:12px;letter-spacing:1px;color:#0f766e;font-weight:700">KİMLİK DOĞRULAMA</div>
+    <div style="font-size:18px;font-weight:800;margin:6px 0 10px">E-posta doğrulama kodu</div>
+    <p id="otpMesaj" style="font-size:13.5px;color:#5b6878;line-height:1.5;margin-bottom:14px">
+      Kod gönderiliyor…</p>
+    <div id="otpDemo" style="display:none;background:#e6fffb;border:1px dashed #0f766e;
+      border-radius:10px;padding:10px;text-align:center;font-weight:800;color:#0f766e;
+      letter-spacing:4px;margin-bottom:14px"></div>
+    <input id="otpInput" inputmode="numeric" maxlength="6" placeholder="6 haneli kod"
+      style="width:100%;font-size:22px;letter-spacing:8px;text-align:center;padding:12px;
+      border:2px solid #cbd5e1;border-radius:10px;box-sizing:border-box;font-weight:800">
+    <div id="otpHata" style="color:#dc2626;font-size:13px;min-height:18px;margin:8px 2px 0"></div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button onclick="otpVazgec()" style="flex:1;padding:12px;border:1px solid #cbd5e1;
+        background:#f1f5f9;border-radius:10px;font-weight:700;cursor:pointer">Vazgeç</button>
+      <button id="otpOnayBtn" onclick="otpOnayla()" style="flex:2;padding:12px;border:0;
+        background:#0f766e;color:#fff;border-radius:10px;font-weight:800;cursor:pointer">Doğrula</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Canli motora bagli karsi-taraf portali. Gercek dosya yuklenir -> /api/yanit (kaydet)
+// -> /api/itiraz (motor) -> sonuc karsi tarafin gozunden gosterilir.
+const TL=n=>Number(n).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const params=new URLSearchParams(location.search);
+const CARI=params.get('cari')||'120.04';   // demo varsayilani: Demir Celik
+const MUSTERI=params.get('musteri')||'';   // hangi mukellef (motor:true firma) — bos ise backend varsayilani
+const MQ=MUSTERI?('&musteri='+encodeURIComponent(MUSTERI)):'';   // GET ekine
+let CARIADI=CARI, _secim=null, MAILAKTIF=false, _otpResolve=null, BIZIMBAK=0, FIRMAAD='ÖRNEK SANAYİ A.Ş.';
+
+const ORNEK={ '120.04':'120.04_Demir_Celik_ekstre.xlsx',
+              '120.07':'120.07_Gul_Plastik_ekstre.xlsx',
+              '120.03':'120.03_Ceyhan_Lojistik_ekstre.xlsx' };
+
+async function yukleForm(){
+  try{
+    const d=await (await fetch('/api/form'+(MUSTERI?'?musteri='+encodeURIComponent(MUSTERI):''))).json();
+    if(d.firma){ FIRMAAD=d.firma;
+      document.getElementById('gonderenAd').textContent=d.firma;
+      document.getElementById('ackFirma').textContent=d.firma; }
+    if(d.donem){ document.querySelectorAll('.meta b')[1] && (document.querySelectorAll('.meta b')[1].textContent=d.donem); }
+    const c=(d.cariler||[]).find(x=>x.cari===CARI);
+    if(!c){document.getElementById('sayin').textContent=`Cari ${CARI} bulunamadı.`;return;}
+    CARIADI=c.adi;
+    BIZIMBAK=c.bizim_bakiye;
+    document.getElementById('sayin').textContent=`Sayın ${c.adi} (${c.cari})`;
+    document.getElementById('b_bizim').textContent=TL(c.bizim_bakiye)+' ₺';
+    // Karsi tarafin bakiyesini ILK mailde BILMIYORUZ -> bos. Ekstre yuklenince doldurulur.
+    document.getElementById('b_karsi').innerHTML='<span class="bekl">Ekstre bekleniyor</span>';
+    document.getElementById('b_fark').innerHTML='<span class="bekl">—</span>';
+    document.getElementById('durozet').classList.remove('sifir');
+    document.getElementById('duroz_yazi').textContent=
+      'Sizin bakiyeniz ekstrenizi yükledikten sonra hesaplanır.';
+    document.getElementById('formno').textContent=`Form No: MUT-${c.cari}-Mayis`;
+    if(ORNEK[CARI]) document.getElementById('ornekipucu').innerHTML=
+      `Demo için örnek ekstre: <b>ornek_ekstreler/${ORNEK[CARI]}</b>`;
+    try{ const md=await (await fetch('/api/maildurum'+(MUSTERI?'?musteri='+encodeURIComponent(MUSTERI):''))).json(); MAILAKTIF=!!md.aktif; }catch(e){}
+  }catch(e){ document.getElementById('sayin').textContent='Sunucuya bağlanılamadı (app.py çalışıyor mu?).'; }
+}
+
+// E-posta OTP: kod ister, modal acar, dogru kodu (string) ya da null (vazgec) doner.
+async function otpAkis(){
+  document.getElementById('otpInput').value='';
+  document.getElementById('otpHata').textContent='';
+  const demo=document.getElementById('otpDemo'); demo.style.display='none';
+  document.getElementById('otpMesaj').textContent='Kod gönderiliyor…';
+  document.getElementById('otpKat').style.display='flex';
+  document.getElementById('otpInput').focus();
+  let r;
+  try{ r=await (await fetch('/api/otp_iste',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({cari:CARI,musteri:MUSTERI})})).json(); }
+  catch(e){ document.getElementById('otpMesaj').textContent='Kod gönderilemedi (sunucu).'; }
+  if(r){
+    if(r.kanal==='demo' && r.demo_kod){
+      document.getElementById('otpMesaj').textContent='Demo modu (mail kapalı): kod ekranda gösteriliyor.';
+      demo.textContent=r.demo_kod; demo.style.display='block';
+    }else{
+      document.getElementById('otpMesaj').innerHTML=`Doğrulama kodu <b>${r.maskeli_mail||''}</b> adresine gönderildi. Gelen kutusunu kontrol edin.`;
+    }
+  }
+  return new Promise(res=>{ _otpResolve=res; });
+}
+function otpVazgec(){ document.getElementById('otpKat').style.display='none';
+  if(_otpResolve){ _otpResolve(null); _otpResolve=null; } }
+function otpOnayla(){ const k=document.getElementById('otpInput').value.trim();
+  if(k.length<6){ document.getElementById('otpHata').textContent='6 haneli kodu girin.'; return; }
+  document.getElementById('otpKat').style.display='none';
+  if(_otpResolve){ _otpResolve(k); _otpResolve=null; } }
+function otpHataGoster(m){ document.getElementById('otpHata').textContent=m||'';
+  document.getElementById('otpKat').style.display='flex'; }
+
+function secim(s){
+  _secim=s;
+  document.getElementById('sec_evet').classList.toggle('aktif',s==='evet');
+  document.getElementById('sec_hayir').classList.toggle('aktif',s==='hayir');
+  document.getElementById('yuklealani').classList.toggle('acik',s==='hayir');
+  const mk=document.getElementById('mutabikkutu'); mk.classList.toggle('acik',s==='evet');
+  if(s==='evet') mutabikGonder();
+}
+function dosyaSecildi(){
+  document.getElementById('calisbtn').disabled = !document.getElementById('dosya').files.length;
+}
+function dataUrl(f){return new Promise(r=>{const x=new FileReader();x.onload=()=>r(x.result);x.readAsDataURL(f);});}
+
+// OTP gerekiyorsa dogru kod girilene kadar /api/yanit'i tekrar dener.
+// otp gerekmiyorsa (demo) tek seferde gonderir. Iptal edilirse false doner.
+async function yanitGonderOTP(govde){
+  let otp='';
+  while(true){
+    if(MAILAKTIF){
+      otp=await otpAkis();
+      if(otp===null) return {iptal:true};
+    }
+    let r;
+    try{ r=await (await fetch('/api/yanit',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({...govde, otp, musteri:MUSTERI})})).json(); }
+    catch(e){ return {hata:'Sunucu hatası'}; }
+    if(r && r.ok) return r;
+    // Backend OTP istiyorsa (mail acik) MAILAKTIF bayragi ne olursa olsun kodu iste ve tekrar dene.
+    if(r && r.otp_gerekli){ if(otp) otpHataGoster(r.hata||'Kod hatalı, tekrar deneyin.'); MAILAKTIF=true; continue; }
+    return r||{hata:'Bilinmeyen hata'};
+  }
+}
+
+async function mutabikGonder(){
+  const r=await yanitGonderOTP({cari:CARI,secim:'MUTABIK',not:'Portaldan onaylandı'});
+  if(r.iptal){ // vazgecildi -> secimi geri al
+    document.getElementById('sec_evet').classList.remove('aktif');
+    document.getElementById('mutabikkutu').classList.remove('acik'); _secim=null;
+  }
+}
+
+async function calistir(){
+  const f=document.getElementById('dosya').files[0];
+  if(!f){ alert('“Mutabık Değiliz” yanıtı için önce kendi cari ekstrenizi yüklemelisiniz.'); return; }
+  if(_secim!=='hayir'){ alert('Lütfen önce “Mutabık Değiliz” seçeneğini işaretleyin.'); return; }
+  // once kimlik dogrulama (mail acikken) + ekstreyi kaydet
+  const b64=await dataUrl(f);
+  const r=await yanitGonderOTP({cari:CARI,secim:'ITIRAZLI',not:'Portaldan ekstre yüklendi',
+    dosya_adi:f.name,dosya_b64:b64});
+  if(r.iptal) return;                 // OTP'den vazgecildi -> adim1'de kal
+  if(!r.ok){ alert('Yanıt kaydedilemedi: '+(r.hata||'')); return; }
+
+  document.getElementById('adim1').style.display='none';
+  const a2=document.getElementById('adim2'); a2.classList.add('acik');
+  const ad=document.getElementById('adimlar'); ad.innerHTML='';
+  const adimlar=["Ekstre sunucuya yüklendi","GİB e-Fatura kayıtlarıyla eşleştirildi",
+    "Eşleşmeyenler akıllı zincirden geçirildi","Eksikler iki tarafa göre etiketlendi"];
+  let i=0; const t=setInterval(()=>{ if(i<adimlar.length){
+    ad.innerHTML+=`<div><span class="ok">✓</span> ${adimlar[i]}</div>`; i++; } else clearInterval(t); },420);
+
+  let d;
+  try{
+    d=await (await fetch('/api/itiraz?cari='+encodeURIComponent(CARI)+MQ)).json();
+  }catch(e){ d={parse:false,mesaj:'Sunucu hatası: '+e}; }
+
+  // adim animasyonu en az ~1sn gorunsun
+  await new Promise(r=>setTimeout(r,Math.max(0,1100-(i*420))));
+  clearInterval(t); a2.classList.remove('acik');
+  sonucCiz(d);
+}
+
+function bakiyeDoldur(d){
+  // Karsi tarafin yukledigi ekstreden okunan bakiyeyi ust karta yaz.
+  if(!d || typeof d.karsi_bakiye==='undefined') return;
+  document.getElementById('b_karsi').textContent=TL(d.karsi_bakiye)+' ₺';
+  const fark=(typeof d.fark!=='undefined')?d.fark:Math.abs(BIZIMBAK-d.karsi_bakiye);
+  document.getElementById('b_fark').textContent=TL(fark)+' ₺';
+  const sifir=fark<0.005;
+  document.getElementById('farkkart').classList.toggle('sifir',sifir);
+  document.getElementById('durozet').classList.toggle('sifir',sifir);
+  document.getElementById('duroz_yazi').textContent=sifir
+    ? 'Yüklediğiniz ekstre ile bakiyeler birebir uyumlu.'
+    : 'Yüklediğiniz ekstreye göre bakiyeler arasında fark var.';
+}
+function sonucCiz(d){
+  bakiyeDoldur(d);
+  const a3=document.getElementById('adim3');
+  if(!d || !d.parse){
+    document.getElementById('ozetbar').innerHTML='';
+    document.getElementById('gruplar').innerHTML=
+      `<div class="grup" style="grid-column:1/-1"><div class="eks">${(d&&(d.mesaj||d.hata))||'Analiz yapılamadı. Lütfen Excel ekstre yükleyin.'}</div></div>`;
+    document.getElementById('kapanis').innerHTML='';
+    a3.classList.add('acik'); return;
+  }
+  // perspektif cevirme: karsi tarafin gozunden
+  // SIZE dusen = bizim analizdeki "karsi_eksik" · KARSIYA dusen = "biz_eksik"
+  const siz=(d.karsi_eksik||[]).map(x=>x.ac);
+  const biz=(d.biz_eksik||[]).map(x=>x.ac);
+  const fark=(d.tutar_farki||[]).map(x=>x.ac);
+  const toplam=siz.length+biz.length+fark.length;
+
+  if(d.mutabik){
+    document.getElementById('ozetbar').innerHTML=
+      `<div class="oz" style="flex-basis:100%"><b style="color:#6ee7b7">✓ Fark 0</b><span>İki ekstre örtüştü</span></div>`;
+    document.getElementById('gruplar').innerHTML='';
+    document.getElementById('kapanis').innerHTML=
+      `Yüklediğiniz ekstre ile ${FIRMAAD} kayıtları <b>tam örtüştü</b>. Karşılıklı onayla mutabakat <b>“Mutabıkız”</b> olarak kapanır.`;
+    a3.classList.add('acik'); return;
+  }
+  document.getElementById('ozetbar').innerHTML=`
+    <div class="oz r"><b>${siz.length}</b><span>size düşen eksik</span></div>
+    <div class="oz o"><b>${biz.length}</b><span>karşı tarafa düşen</span></div>
+    <div class="oz b"><b>${fark.length}</b><span>tutar farkı</span></div>`;
+  const grup=(cls,bas,arr)=>`<div class="grup ${cls}">
+     <div class="gb">${bas} (${arr.length})</div>
+     ${arr.length?arr.map(t=>`<div class="eks">${t}</div>`).join(''):'<div class="eksbos">— eksik yok —</div>'}</div>`;
+  document.getElementById('gruplar').innerHTML=
+    grup('siz',`🔴 SİZE düşen — ${CARIADI} tamamlayacak`,siz)+
+    grup('biz',`🟠 KARŞI TARAFA düşen — ${FIRMAAD} tamamlayacak`,biz)+
+    grup('fark','⚖️ Tutar farkı — GİB hakem',fark);
+  document.getElementById('kapanis').innerHTML=
+    `Toplam <b>${toplam}</b> kalem fark bulundu (karşı ekstrede ${d.karsi_satir||0} satır okundu). `+
+    `Her iki taraf kendi eksiğini tamamladığında fark <b>0</b>'a iner; sistem yeniden çalışınca bakiye `+
+    `eşitlenir ve karşılıklı <b>“Mutabıkız”</b> ile mutabakat kapanır. `+
+    `<b>Bu eksikleri artık siz de görüyorsunuz</b> — anlaşmazlık bir e-postada kaybolmaz.`;
+  a3.classList.add('acik');
+}
+function tekrar(){
+  document.getElementById('adim3').classList.remove('acik');
+  document.getElementById('adim1').style.display='';
+  document.getElementById('dosya').value='';
+  document.getElementById('calisbtn').disabled=true;
+  document.getElementById('sec_evet').classList.remove('aktif');
+  document.getElementById('sec_hayir').classList.remove('aktif');
+  document.getElementById('yuklealani').classList.remove('acik');
+  document.getElementById('mutabikkutu').classList.remove('acik');
+  _secim=null;
+}
+yukleForm();
+</script>
+</body>
+</html>

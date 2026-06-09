@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Akıllı Mutabakat — Canlı Akış Demosu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0e1d3d;--yuzey:#172a4d;--yuzey2:#1e3357;--cizgi:rgba(255,255,255,.10);
+    --metin:#f8fafc;--soluk:#94a3b8;
+    --mavi:#14b8a6;--yesil:#10b981;--kirmizi:#f43f5e;--turuncu:#f59e0b;--mor:#6366f1;
+  }
+  *{box-sizing:border-box}
+  body{font-family:'Inter','Segoe UI',Arial,sans-serif;margin:0;background:var(--bg);color:var(--metin)}
+  header{background:linear-gradient(180deg,#13294d,#0e1d3d);border-bottom:1px solid var(--cizgi);
+    padding:16px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
+  header h1{font-size:18px;margin:0;flex:1;font-weight:600}
+  header .donem{color:var(--soluk);font-size:13px}
+  .btn{border:0;border-radius:8px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer}
+  .btn.pri{background:var(--mavi);color:#06101f}
+  .btn.ghost{background:transparent;color:var(--mavi);border:1.5px solid var(--mavi)}
+  .btn:hover{filter:brightness(1.08)}
+  .wrap{padding:20px 24px;max-width:1360px;margin:0 auto}
+  /* yatay pipeline — uzun dikey dikdortgen kartlar */
+  .pipe{display:flex;flex-direction:row;gap:6px;align-items:stretch;overflow-x:auto;padding-bottom:10px;margin-bottom:18px}
+  .ok{align-self:center;color:#3a4654;font-size:22px;line-height:1;flex:0 0 auto}
+  .kart{flex:1 1 0;min-width:150px;min-height:230px;background:var(--yuzey);border:1px solid var(--cizgi);border-radius:14px;
+    padding:16px 14px;display:flex;flex-direction:column;gap:10px;transition:.15s;cursor:pointer;position:relative}
+  .kart:hover{border-color:#3b4a5c;transform:translateY(-2px)}
+  .kart.aktif{border-color:var(--mavi);box-shadow:0 0 0 1px var(--mavi),0 10px 26px -12px rgba(20,184,166,.55);background:var(--yuzey2)}
+  .kart.bitti{border-color:#244b32}
+  .basrow{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+  .rozet{width:30px;height:30px;border-radius:50%;background:#222c38;color:var(--soluk);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex:0 0 auto}
+  .kart.bitti .rozet{background:var(--yesil);color:#06140b}
+  .kart.aktif .rozet{background:var(--mavi);color:#06101f}
+  .kart h3{margin:0;font-size:14px;font-weight:600}
+  .kart .gc{font-size:11px;color:var(--soluk);line-height:1.45}
+  .kart .durum{font-size:11.5px;color:var(--soluk);min-height:15px}
+  .kart .run{margin-top:auto;font-size:12px;padding:8px 10px;align-self:stretch;text-align:center}
+  /* detay */
+  .detay{background:var(--yuzey);border:1px solid var(--cizgi);border-radius:16px;overflow:hidden;min-height:420px}
+  .detay .ust{padding:14px 20px;border-bottom:1px solid var(--cizgi);display:flex;align-items:center;gap:12px;
+    background:linear-gradient(180deg,#1e3357,#172a4d)}
+  .detay .ust .n{background:var(--mavi);color:#06101f;border-radius:8px;padding:3px 11px;font-weight:700;font-size:14px}
+  .detay .ust h2{font-size:16px;margin:0;font-weight:600}
+  .io{display:grid;grid-template-columns:280px 1fr;gap:0;min-height:300px}
+  @media(max-width:880px){.io{grid-template-columns:1fr}}
+  .io .girdi{background:#11161d;border-right:1px solid var(--cizgi);padding:18px;font-size:13px;line-height:1.6;color:#c4cfdb}
+  .io .cikti{padding:18px}
+  .io h4{margin:0 0 12px;font-size:11px;letter-spacing:.8px;color:var(--soluk);text-transform:uppercase}
+  .io .girdi b{color:var(--metin)}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--cizgi);text-align:left}
+  th{color:var(--soluk);font-weight:600;font-size:11px;text-transform:uppercase}
+  td.sag,th.sag{text-align:right}
+  tbody tr:hover{background:#19212b}
+  .pill{padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;color:#06101f;white-space:nowrap}
+  .kutu{border:1px solid var(--cizgi);border-radius:12px;padding:14px;margin-bottom:14px;background:#11161d}
+  .kutu h5{margin:0 0 10px;font-size:13px;display:flex;align-items:center;gap:8px;font-weight:600}
+  .satir{font-size:13px;padding:8px 0;border-bottom:1px dashed var(--cizgi);line-height:1.5}
+  .satir:last-child{border:0}
+  .satir b{color:var(--metin)}
+  .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;margin-right:7px}
+  .tag.gib{background:rgba(244,63,94,.16);color:#fda4af}
+  .tag.eks{background:rgba(245,158,11,.16);color:#fcd34d}
+  .istat{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+  .ist{background:#11161d;border:1px solid var(--cizgi);border-radius:12px;padding:13px 18px;text-align:center;min-width:118px}
+  .ist b{display:block;font-size:26px;font-weight:700}.ist span{font-size:12px;color:var(--soluk)}
+  /* form */
+  .formkart{max-width:540px;border:1px solid var(--cizgi);border-radius:14px;overflow:hidden;background:#11161d}
+  .formkart .fb{background:linear-gradient(135deg,#0d9488,#14b8a6);color:#fff;padding:16px 20px}
+  .formkart .fb b{font-size:15px}.formkart .fb div{font-size:12px;opacity:.92}
+  .formkart .fg{padding:20px}
+  .bak{display:flex;gap:10px;margin:6px 0 14px}
+  .bak .b{flex:1;border:1px solid var(--cizgi);border-radius:10px;padding:13px;text-align:center;background:var(--yuzey)}
+  .bak .b small{color:var(--soluk);font-size:11px}.bak .b b{display:block;font-size:18px;margin-top:4px}
+  .farkb{text-align:center;padding:10px;border-radius:10px;font-size:13px;margin-bottom:14px;font-weight:600}
+  .farkb.ok{background:rgba(16,185,129,.14);color:var(--yesil)}.farkb.no{background:rgba(244,63,94,.14);color:#fda4af}
+  .fbtn{display:flex;gap:10px}.fbtn button{flex:1;padding:13px;border:0;border-radius:10px;font-weight:700;cursor:pointer}
+  .fbtn .evet{background:var(--yesil);color:#06140b}.fbtn .hayir{background:transparent;color:#fda4af;border:2px solid var(--kirmizi)}
+  .yukle{margin-top:14px;padding:16px;border:2px dashed #3a4654;border-radius:12px;display:none;background:var(--yuzey)}
+  .yukle.acik{display:block}
+  .yukle label{font-size:13px;font-weight:600;display:block;margin-bottom:10px}
+  select,input[type=file],textarea{font-family:inherit;font-size:13px;background:#0c1a36;color:var(--metin);border:1px solid var(--cizgi)}
+  input[type=file]{padding:8px;border-radius:8px;width:100%}
+  textarea{padding:9px;border-radius:8px;width:100%}
+  .sel{padding:10px;border-radius:10px;margin-bottom:16px;width:100%}
+  .mut{color:var(--soluk);font-size:12px;margin-top:12px}
+  .bos{color:var(--soluk);font-size:13px;padding:18px;text-align:center}
+  a{color:var(--mavi)}
+  .girisbos{padding:28px;color:var(--soluk);line-height:1.7}
+  .loader{color:var(--soluk);font-size:13px;padding:14px}
+  /* === Gonderim turu + rapor ici eksik detayi === */
+  .gonderbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:8px}
+  .gnote{color:var(--soluk);font-size:12px}
+  tr.tikla{cursor:pointer}
+  tr.tikla:hover>td{background:#172230}
+  .rlink{color:var(--mavi);font-size:11px;font-weight:600;margin-left:6px}
+  tr.rdet>td{background:#11161d;padding:14px}
+  .ikili{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:760px){.ikili{grid-template-columns:1fr}}
+  .aksut .akbas{font-weight:700;font-size:12.5px;margin-bottom:8px}
+  .aksut .akbas span{color:var(--soluk);font-weight:500}
+  .akrow{background:var(--yuzey);border-left:3px solid var(--soluk);padding:8px 10px;border-radius:8px;
+    margin-bottom:6px;font-size:12.5px;line-height:1.45;color:var(--metin)}
+  .akbos{color:var(--soluk);font-size:12.5px;opacity:.6;padding:4px 0}
+  /* === Resmi mutabakat belgesi (beyaz, yazdirilabilir) === */
+  .formarac{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .belge{background:#fff;color:#1a2230;border-radius:6px;max-width:720px;margin:0 auto;
+    padding:38px 44px;font-size:14px;line-height:1.6;box-shadow:0 18px 50px -18px rgba(0,0,0,.7);
+    border:1px solid #d9e0e8}
+  .belge .blet{display:flex;justify-content:space-between;align-items:flex-start;
+    border-bottom:3px solid #1a3a6b;padding-bottom:14px;margin-bottom:18px}
+  .belge .blet .firm{font-size:20px;font-weight:800;color:#10305f;letter-spacing:.3px}
+  .belge .blet .alt{font-size:12.5px;color:#5a6675;margin-top:3px}
+  .belge .blet .meta{font-size:12.5px;color:#3a4453;text-align:right;line-height:1.7}
+  .belge h3.bbas{text-align:center;font-size:16px;font-weight:800;color:#10305f;
+    letter-spacing:.5px;margin:6px 0 18px;text-transform:uppercase}
+  .belge p{margin:0 0 12px}
+  .belge .sayin{font-weight:700}
+  .btab{width:100%;border-collapse:collapse;margin:14px 0 8px;font-size:13.5px}
+  .btab th,.btab td{border:1px solid #ccd4de;padding:9px 12px}
+  .btab th{background:#eef3f9;color:#2a3950;text-align:left;font-weight:700;font-size:12px;text-transform:none}
+  .btab td.sag{text-align:right;font-variant-numeric:tabular-nums}
+  .btab tr.vurgu td{background:#f5f8fc;font-weight:800;color:#10305f}
+  .bfark{margin:6px 0 20px;padding:10px 14px;border-radius:6px;font-size:13.5px;font-weight:700}
+  .bfark.ok{background:#e7f6ec;color:#1a7a37;border:1px solid #bfe6cb}
+  .bfark.no{background:#fdeceb;color:#b3261e;border:1px solid #f3c6c2}
+  .bonay{display:flex;gap:14px;margin-top:6px}
+  .secenek{flex:1;border:2px solid #d2dae4;border-radius:8px;padding:14px;cursor:pointer;transition:.15s;background:#fff}
+  .secenek:hover{border-color:#1a3a6b}
+  .secenek.sec.evet{border-color:#1a7a37;background:#f1faf3}
+  .secenek.sec.hayir{border-color:#b3261e;background:#fdf2f1}
+  .secenek .kutucuk{display:flex;align-items:center;gap:9px;font-weight:800;font-size:14px;color:#1a2230}
+  .secenek .box{width:20px;height:20px;border:2px solid #8a97a6;border-radius:4px;display:flex;
+    align-items:center;justify-content:center;font-size:14px;color:#fff;flex:0 0 auto}
+  .secenek.sec.evet .box{background:#1a7a37;border-color:#1a7a37}
+  .secenek.sec.hayir .box{background:#b3261e;border-color:#b3261e}
+  .secenek .acik{font-size:12px;color:#5a6675;margin-top:7px;line-height:1.45}
+  .kase{margin-top:14px;border-top:1px dashed #c4ccd6;padding-top:10px;font-size:11.5px;color:#6a7585}
+  .kase .imzalar{display:flex;justify-content:space-between;margin-top:30px;font-size:12px;color:#3a4453}
+  .kase .imzalar div{border-top:1px solid #9aa6b4;padding-top:5px;width:45%;text-align:center}
+  .belge .dipnot{margin-top:22px;font-size:11px;color:#8a95a3;border-top:1px solid #e6ebf1;padding-top:10px;line-height:1.5}
+  @media print{
+    body{background:#fff !important}
+    header,.pipe,.foot,.hint,.ust,.formarac,.io>.girdi,.io h4,.sel,#carisec,.yukle,.mut{display:none !important}
+    .wrap{padding:0;max-width:none}
+    .detay,.io,.io>.cikti{border:0 !important;background:#fff !important;padding:0 !important;display:block !important}
+    .belge{box-shadow:none;border:0;max-width:none;margin:0}
+    #itirazalani{display:none !important}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Akıllı Mutabakat <span style="color:var(--soluk);font-weight:400">— Canlı Akış Demosu</span></h1>
+  <span class="donem" id="donem"></span>
+  <button class="btn ghost" onclick="sifirla()">Sıfırla</button>
+  <button class="btn pri" onclick="tumunu()">Tümünü Çalıştır ▶</button>
+</header>
+
+<div class="wrap">
+  <div class="pipe" id="pipe"></div>
+  <div class="detay" id="detay">
+    <div class="ust"><span class="n">i</span><h2>Bir aşamaya tıklayın ya da "Tümünü Çalıştır"</h2></div>
+    <div class="girisbos">
+      Bu demo cari mutabakatını 6 aşamada, soldan sağa <b>girdi → çıktı</b> mantığıyla gösterir.
+      Üstteki kutucuklara sırayla tıklayarak ya da "Tümünü Çalıştır" ile akışı başlatın.
+    </div>
+  </div>
+</div>
+
+<script>
+const ASAMA = [
+  {n:1,ad:"Veri Yükleme",ep:"/api/yukle",girdi:"Bizim ekstre + Karşı ekstre + GİB e-Fatura"},
+  {n:2,ad:"GİB Kontrolü",ep:"/api/gib",girdi:"e-Faturalar — GİB otorite kabul edilir"},
+  {n:3,ad:"Eşleştirme Motoru",ep:"/api/eslestir",girdi:"e-Arşiv + Ödemeler (GİB dışı)"},
+  {n:4,ad:"Triyaj & Rapor",ep:"/api/triyaj",girdi:"GİB + ekstre sonuçlarının birleşimi"},
+  {n:5,ad:"Mutabakat Formu",ep:"/api/form",girdi:"Seçilen cari için form"},
+  {n:6,ad:"Yanıt & Takip",ep:"/api/takip",girdi:"Karşı tarafın form yanıtları"},
+];
+const veri = {};
+let aktif = 0;
+const TL = x => (x==null?"-":Number(x).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}));
+
+function pipeCiz(){
+  const p = document.getElementById('pipe'); p.innerHTML='';
+  ASAMA.forEach((a,i)=>{
+    if(i>0){const o=document.createElement('div');o.className='ok';o.textContent='→';p.appendChild(o);}
+    const d=document.createElement('div');
+    d.className='kart'+(aktif===a.n?' aktif':'')+(veri[a.n]?' bitti':'');
+    d.onclick=()=>calistir(a.n);
+    d.innerHTML=`<div class="basrow">
+        <div class="rozet">${veri[a.n]?'✓':a.n}</div><h3>${a.ad}</h3></div>
+      <div class="gc">Girdi: ${a.girdi}</div>
+      <div class="durum" id="durum${a.n}">${veri[a.n]?'Tamamlandı':'Bekliyor'}</div>
+      <button class="btn pri run" onclick="event.stopPropagation();calistir(${a.n})">Çalıştır</button>`;
+    p.appendChild(d);
+  });
+}
+
+async function calistir(n){
+  const a = ASAMA[n-1];
+  const r = await fetch(a.ep); veri[n] = await r.json();
+  aktif = n; pipeCiz(); detayCiz(n);
+}
+async function tumunu(){ for(let i=1;i<=4;i++){await calistir(i);} await calistir(5); }
+async function sifirla(){ for(const k in veri) delete veri[k]; aktif=0; pipeCiz();
+  document.getElementById('detay').innerHTML=
+    `<div class="ust"><span class="n">i</span><h2>Sıfırlandı — yeniden başlatın</h2></div>
+     <div class="girisbos">Üstteki kutucuklara tıklayarak akışı yeniden başlatabilirsiniz.</div>`; }
+
+function ust(n,ad){ return `<div class="ust"><span class="n">${n}</span><h2>${ad}</h2></div>`; }
+function io(girdiHtml,ciktiHtml){
+  return `<div class="io"><div class="girdi"><h4>Girdi</h4>${girdiHtml}</div>
+    <div class="cikti"><h4>Çıktı</h4>${ciktiHtml}</div></div>`; }
+
+function detayCiz(n){
+  const det = document.getElementById('detay');
+  const d = veri[n]; const a = ASAMA[n-1];
+  if(n===1){
+    const tip = Object.entries(d.tipler).map(([k,v])=>`${k}: <b>${v}</b>`).join(" &nbsp;·&nbsp; ");
+    const rows = d.onizleme.map(r=>`<tr><td>${r.cari}</td><td>${r.tarih}</td><td>${r.belge_no}</td>
+      <td>${r.belge_tipi}</td><td class="sag">${TL(r.tutar)}</td></tr>`).join("");
+    det.innerHTML = ust(1,a.ad)+io(
+      `Bizim defter, karşı tarafın ekstresi ve <b>GİB e-Fatura</b> otorite kaydı okunur, ortak şablona normalize edilir.`,
+      `<div class="istat">
+         <div class="ist"><b>${d.bizim}</b><span>bizim satır</span></div>
+         <div class="ist"><b>${d.karsi}</b><span>karşı satır</span></div>
+         <div class="ist"><b>${d.gib}</b><span>GİB e-Fatura</span></div></div>
+       <div style="font-size:12px;color:var(--soluk);margin-bottom:12px">Belge tipleri: ${tip}</div>
+       <table><thead><tr><th>Cari</th><th>Tarih</th><th>Belge</th><th>Tip</th><th class="sag">Tutar</th></tr></thead>
+       <tbody>${rows}</tbody></table>`);
+  }
+  else if(n===2){
+    const liste = (arr,cls)=>arr.length? arr.map(x=>`<div class="satir">
+        <span class="tag ${cls}">GİB-KESİN</span><b>${x.cari}</b> ${x.adi} — ${x.ac}</div>`).join("")
+        : `<div class="bos">—</div>`;
+    det.innerHTML = ust(2,a.ad)+io(
+      `e-Faturalar için <b>GİB otoritedir</b>. "GİB'de var, defterde yok / tutar farklı" kesin tespit edilir; format farkı (FT-2026-00318 ↔ 318) yutulur.`,
+      `<div class="kutu"><h5>🟠 KARŞI TARAFA bildirim gidecek (${d.karsiya.length})</h5>${liste(d.karsiya,'gib')}</div>
+       <div class="kutu"><h5>🔴 BİZE düşen (göndermeden önce tamamla) (${d.bize.length})</h5>${liste(d.bize,'gib')}</div>
+       <div style="font-size:12px;color:var(--soluk)">GİB + ekstre uyumlu (temiz): ${d.temiz.join(" · ")||"—"}</div>`);
+  }
+  else if(n===3){
+    const s=d.sayac;
+    const orn = d.ornekler.length? d.ornekler.map(o=>`<div class="satir">
+        <span class="tag eks">${o.tip}</span><b>${o.cari}</b> — ${o.ac}</div>`).join("")
+        : `<div class="bos">Bu veri setinde e-arşiv/ödeme tarafında özel örnek yok.</div>`;
+    det.innerHTML = ust(3,a.ad)+io(
+      `GİB'in kapsamadığı <b>e-Arşiv faturaları ve tüm ödemeler</b> burada eşleştirilir. Otorite yok; delil iki ekstredir.`,
+      `<div class="istat">
+         <div class="ist"><b>${s.EXACT}</b><span>tam eşleşme</span></div>
+         <div class="ist"><b>${s.FUZZY}</b><span>toleranslı</span></div>
+         <div class="ist"><b>${s.SUBSET_SUM}</b><span>parçalı (subset-sum)</span></div></div>
+       <h5 style="margin:4px 0 10px;font-size:13px">Öne çıkan eşleşmeler</h5>${orn}`);
+  }
+  else if(n===4){
+    const oran = Math.round(100*d.mutabik/d.toplam);
+    const rows = d.cariler.map(c=>{
+      const col = c.durum==='MUTABIK'?'var(--yesil)':'var(--turuncu)';
+      const tik = c.durum!=='MUTABIK';
+      return `<tr ${tik?`class="tikla" onclick="farkAc('${c.cari}','${(c.adi||'').replace(/'/g,'')}')"`:''}>
+        <td>${c.cari}</td><td>${c.adi}</td>
+        <td class="sag">${TL(c.bizim_bakiye)}</td><td class="sag">${TL(c.karsi_bakiye)}</td>
+        <td><span class="pill" style="background:${col}">${c.durum==='MUTABIK'?'MUTABIK':'AKSİYON ('+c.fark_sayisi+')'}</span>${tik?' <span style="font-size:11px;color:var(--soluk)">▸ elle eşleştir</span>':''}</td></tr>`;
+    }).join("");
+    det.innerHTML = ust(4,a.ad)+io(
+      `2. ve 3. aşamanın bulguları cari bazında birleştirilir; otomatik kapananlar elenir, insan gözü gerekenler öne çıkar. <b>AKSİYON satırına tıkla</b> → eksikleri elle kapat/eşleştir.`,
+      `<div class="istat">
+         <div class="ist"><b>${d.toplam}</b><span>toplam cari</span></div>
+         <div class="ist"><b style="color:var(--yesil)">${d.mutabik}</b><span>otomatik mutabık</span></div>
+         <div class="ist"><b style="color:var(--turuncu)">${d.aksiyon}</b><span>aksiyon gerek</span></div>
+         <div class="ist"><b>%${oran}</b><span>kapanma oranı</span></div></div>
+       <div id="caprazUyari" style="margin:6px 0 12px"></div>
+       <table><thead><tr><th>Cari</th><th>Unvan</th><th class="sag">Bizim</th><th class="sag">Karşı</th><th>Durum</th></tr></thead>
+       <tbody>${rows}</tbody></table>
+       <div id="farkDetay" style="margin-top:14px"></div>`);
+    caprazYukle();
+  }
+  else if(n===5){ formCiz(); }
+  else if(n===6){ takipCiz(); }
+}
+
+function formCiz(){
+  const d = veri[5]; const det = document.getElementById('detay');
+  document.getElementById('donem').textContent = d.firma+" · "+d.donem;
+  const opts = d.cariler.map((c,i)=>`<option value="${i}">${c.cari} — ${c.adi} ${c.esit?'(bakiye tutuyor)':'(fark var)'}</option>`).join("");
+  det.innerHTML = ust(5,"Mutabakat Formu (karşı tarafa giden)")+io(
+    `Bir cari seçin. Karşı tarafa <b>mail veya WhatsApp</b> ile bu form gider. "Mutabıkız" derse kaşeli-imzalı belgeyi, "Mutabık Değiliz" derse kendi ekstresini yükler — sistem iki ekstreyi <b>canlı</b> karşılaştırır.`,
+    `<select class="sel" id="carisec" onchange="formGoster()">${opts}</select>
+     <div id="formalani"></div>`);
+  formGoster();
+}
+function bugun(){const t=new Date();const p=n=>String(n).padStart(2,'0');return `${p(t.getDate())}.${p(t.getMonth()+1)}.${t.getFullYear()}`;}
+function formGoster(){
+  const d = veri[5]; const i = +document.getElementById('carisec').value; const c = d.cariler[i];
+  const fark = Math.abs(c.bizim_bakiye-c.karsi_bakiye);
+  const farkHtml = fark<=0.01
+    ? `<div class="bfark ok">İki taraf bakiyesi birebir örtüşmektedir.</div>`
+    : `<div class="bfark no">Kayıtlarımız arasında ${TL(fark)} ₺ tutarında fark görünmektedir.</div>`;
+  const y = c.yanit && c.yanit.durum;
+  const ybilgi = y ? `<div class="mut">Son kayıtlı yanıt: <b>${y==='MUTABIK'?'Mutabıkız':'Mutabık Değiliz'}</b>
+      ${c.yanit.dosya?` — <a href="/uploads/${c.yanit.dosya}" target="_blank">yüklenen belge</a>`:''}</div>` : '';
+  const formNo = `MUT-${c.cari}-${d.donem.replace(/\s/g,'').slice(0,5)}`;
+  document.getElementById('formalani').innerHTML = `
+    <div class="formarac">
+      <button class="btn ghost" onclick="window.print()">🖨️ Formu Yazdır / PDF</button>
+    </div>
+    <div class="belge" id="mutBelge">
+      <div class="blet">
+        <div><div class="firm">${d.firma}</div><div class="alt">Cari Hesap Mutabakat Birimi</div></div>
+        <div class="meta">Dönem: <b>${d.donem}</b><br>Düzenleme: ${bugun()}<br>Form No: ${formNo}</div>
+      </div>
+      <h3 class="bbas">Cari Hesap Mutabakat Formu</h3>
+      <p class="sayin">Sayın ${c.adi} (${c.cari}),</p>
+      <p>Şirketimiz defter kayıtlarına göre <b>${d.donem}</b> dönemi sonu itibarıyla aramızdaki cari hesap
+         durumu aşağıda belirtilmiştir. Mutabık iseniz ilgili bölümü işaretleyip kaşeleyerek/imzalayarak,
+         mutabık değilseniz kendi hesap ekstrenizi ekleyerek tarafımıza iletmenizi rica ederiz.</p>
+      <table class="btab">
+        <thead><tr><th>Açıklama</th><th style="text-align:right">Tutar (₺)</th></tr></thead>
+        <tbody>
+          <tr><td>Bizim kayıtlarımıza göre bakiyeniz</td><td class="sag">${TL(c.bizim_bakiye)}</td></tr>
+          <tr><td>Sizin bildirdiğiniz bakiye</td><td class="sag">${TL(c.karsi_bakiye)}</td></tr>
+          <tr class="vurgu"><td>Fark</td><td class="sag">${TL(fark)}</td></tr>
+        </tbody>
+      </table>
+      ${farkHtml}
+      <div class="bonay">
+        <div class="secenek evet" id="sec_MUTABIK" onclick="secimAc('${c.cari}','MUTABIK')">
+          <div class="kutucuk"><span class="box">✓</span> MUTABIKIZ</div>
+          <div class="acik">Yukarıdaki bakiye kayıtlarımızla uyumludur. Kaşeli-imzalı bu formu tarafınıza iletiyoruz.</div>
+        </div>
+        <div class="secenek hayir" id="sec_ITIRAZLI" onclick="secimAc('${c.cari}','ITIRAZLI')">
+          <div class="kutucuk"><span class="box">✕</span> MUTABIK DEĞİLİZ</div>
+          <div class="acik">Bakiye kayıtlarımızla uyumsuzdur. Hesap ekstremizi ekte sunuyoruz.</div>
+        </div>
+      </div>
+      <div class="kase">
+        Karşı taraf bu bölümü doldurur:
+        <div class="imzalar"><div>Yetkili Adı / İmza</div><div>Kaşe</div></div>
+      </div>
+      <div class="dipnot">Bu form 6102 sayılı TTK çerçevesinde mutabakat amacıyla düzenlenmiştir.
+        Tarafınıza ulaştığı tarihten itibaren 8 gün içinde yanıt verilmesi rica olunur.</div>
+    </div>
+    <div class="yukle" id="yuklealani">
+      <label id="yuklelabel"></label>
+      <input type="file" id="dosya"><br><br>
+      <textarea id="not" placeholder="Not (opsiyonel)" rows="2"></textarea>
+      <br><br><button class="btn pri" onclick="gonder('${c.cari}')">Gönder</button>
+    </div>
+    ${ybilgi}
+    <div id="itirazalani"></div>`;
+  if(y){ const e=document.getElementById('sec_'+y); if(e) e.classList.add('sec'); }
+}
+let _secim=null;
+function secimAc(cari,secim){
+  _secim=secim;
+  document.getElementById('sec_MUTABIK').classList.toggle('sec',secim==='MUTABIK');
+  document.getElementById('sec_ITIRAZLI').classList.toggle('sec',secim==='ITIRAZLI');
+  const yk=document.getElementById('yuklealani'); yk.classList.add('acik');
+  document.getElementById('yuklelabel').textContent = secim==='MUTABIK'
+    ? 'Kaşeli-imzalı mutabakat formunu yükleyin (PDF/foto):'
+    : 'Kendi cari ekstrenizi yükleyin (Excel/PDF/foto) — sistem farkları otomatik çıkaracak:';
+}
+async function gonder(cari){
+  const f=document.getElementById('dosya').files[0];
+  const not=document.getElementById('not').value;
+  const body={cari,secim:_secim,not};
+  if(f){ body.dosya_adi=f.name; body.dosya_b64=await dataUrl(f); }
+  await fetch('/api/yanit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  veri[5]=await (await fetch('/api/form')).json();
+  formGoster();
+  if(_secim==='ITIRAZLI'){ itirazCiz(cari); }
+  else { alert('Mutabıkız kaydedildi. 6. aşama Takip ekranına düştü.'); }
+}
+async function itirazCiz(cari){
+  const el=document.getElementById('itirazalani');
+  el.innerHTML=`<div class="loader">Yüklenen ekstre okunuyor, farklar çıkarılıyor…</div>`;
+  const r=await fetch('/api/itiraz?cari='+encodeURIComponent(cari));
+  const d=await r.json();
+  if(!d.parse){ el.innerHTML=`<div class="kutu" style="margin-top:16px"><h5>ℹ️ Otomatik analiz</h5>
+     <div class="satir">${d.mesaj||d.hata||'Analiz yapılamadı.'}</div></div>`; return; }
+  const grup=(bas,arr,cls)=>`<div class="kutu"><h5>${bas} (${arr.length})</h5>${
+     arr.length? arr.map(x=>`<div class="satir"><span class="tag ${cls}">${x.kaynak||x.taraf||'fark'}</span>${x.ac}</div>`).join("")
+     : `<div class="bos">— yok —</div>`}</div>`;
+  const ozet = d.mutabik
+    ? `<div class="farkb ok" style="margin-top:16px">İki ekstre örtüştü — fark 0. Karşı taraf onayıyla MUTABIK olur.</div>`
+    : `<div class="farkb no" style="margin-top:16px">Karşı tarafın yüklediği ekstreye göre güncel farklar (her eksik ilgili tarafa görev):</div>`;
+  el.innerHTML = ozet + (d.mutabik?'':
+     grup('🔴 BİZE düşen — kendi eksiğimizi biz tamamlarız', d.biz_eksik,'gib')+
+     grup('🟠 KARŞIYA düşen — karşı taraf tamamlayacak', d.karsi_eksik,'eks')+
+     grup('⚖️ Tutar farkı — GİB hakemliğinde', d.tutar_farki,'gib'))
+     + `<div class="mut">Karşı ekstrede ${d.karsi_satir} satır okundu. Eksikler tamamlanıp yeniden mutabakat çalışınca fark 0 → MUTABIK.</div>`;
+}
+function dataUrl(f){return new Promise(r=>{const x=new FileReader();x.onload=()=>r(x.result);x.readAsDataURL(f);});}
+
+function takipCiz(){
+  const d=veri[6]; const det=document.getElementById('detay');
+  const renk={BEKLIYOR:'var(--soluk)',MUTABIK:'var(--yesil)',ITIRAZLI:'var(--kirmizi)'};
+  const et={BEKLIYOR:'Yanıt bekleniyor',MUTABIK:'MUTABIK 🔒',ITIRAZLI:'Mutabık değil — itiraz'};
+  const bekleyen=d.cariler.filter(c=>c.durum==='BEKLIYOR').length;
+  const tur=d.tur||0;
+  const rows=d.cariler.map(c=>{
+    const tik=c.durum==='ITIRAZLI';
+    const key=c.cari.replace(/[^a-zA-Z0-9]/g,'_');
+    const sec=c.durum==='BEKLIYOR'
+      ? `<input type="checkbox" class="gsec" value="${c.cari}" onclick="event.stopPropagation()">`
+      : '';
+    const ana=`<tr ${tik?`class="tikla" onclick="raporDetay('${c.cari}','${key}')"`:''}>
+       <td>${sec}</td>
+       <td>${c.cari}${tik?' <span class="rlink">▸ eksikleri gör</span>':''}</td><td>${c.adi}</td>
+       <td class="sag">${TL(c.bizim_bakiye)}</td><td class="sag">${TL(c.karsi_bakiye)}</td>
+       <td><span class="pill" style="background:${renk[c.durum]}">${et[c.durum]}</span></td>
+       <td style="color:var(--soluk);font-size:12px">${c.gonderim?`${c.gonderim}. gönderim`:'gönderilmedi'}</td>
+       <td>${c.dosya?`<a href="/uploads/${c.dosya}" target="_blank" onclick="event.stopPropagation()">belge</a>`:'-'}</td></tr>`;
+    const detr=tik?`<tr id="rd_${key}" class="rdet" style="display:none" data-acik="0"></tr>`:'';
+    return ana+detr;
+  }).join("");
+  det.innerHTML=ust(6,"Yanıt & Takip Ekranı (bizim ekranımız)")+io(
+    `Karşı taraf formda işaretledikçe sonuç buraya düşer. <b>İtirazlı</b> satıra tıklayın → iki tarafın yapması gereken eksikler açılır. Gönderim turlarında <b>yanıt verene tekrar form gitmez</b> (mükerrer önleme).`,
+    `<div class="istat">
+       <div class="ist"><b style="color:var(--yesil)">${d.sayac.MUTABIK||0}</b><span>mutabık</span></div>
+       <div class="ist"><b style="color:var(--kirmizi)">${d.sayac.ITIRAZLI||0}</b><span>itirazlı</span></div>
+       <div class="ist"><b style="color:var(--soluk)">${d.sayac.BEKLIYOR||0}</b><span>bekliyor</span></div>
+       <div class="ist"><b style="color:var(--mavi)">${tur}</b><span>tamamlanan tur</span></div></div>
+     <div class="gonderbar">
+       <button class="btn pri" onclick="topluGonder()">📤 ${tur>0?(tur+1)+'. tur — ':''}Yanıt vermeyen ${bekleyen} cariye gönder</button>
+       <button class="btn ghost" onclick="seciliGonder()">✓ Seçili carilere gönder</button>
+       <span class="gnote">Toplu gönderim 1. turda yanıtlayanları otomatik atlar.</span>
+     </div>
+     <div id="gonderimsonuc"></div>
+     <table><thead><tr><th><input type="checkbox" onclick="tumSec(this)"></th><th>Cari</th><th>Unvan</th><th class="sag">Bizim</th><th class="sag">Karşı</th><th>Durum</th><th>Gönderim</th><th>Belge</th></tr></thead>
+     <tbody>${rows}</tbody></table>`);
+}
+function tumSec(box){document.querySelectorAll('.gsec').forEach(c=>c.checked=box.checked);}
+function gonderimOzet(g){
+  const o=document.getElementById('gonderimsonuc'); if(!o) return;
+  o.innerHTML=`<div class="farkb ok" style="margin:12px 0">
+     <b>${g.tur}. gönderim (${g.tip==='secili'?'seçili':'toplu'}) tamamlandı.</b>
+     ${g.gonderilen_sayi} cariye form gönderildi.
+     ${g.atlanan_sayi>0?` <b style="color:var(--turuncu)">${g.atlanan_sayi} cari</b> zaten yanıtladığı için atlandı — <b>mükerrer önlendi</b>.`:''}</div>`;
+}
+async function topluGonder(){
+  const r=await fetch('/api/gonder',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+  const g=await r.json();
+  veri[6]=await (await fetch('/api/takip')).json(); takipCiz(); gonderimOzet(g);
+}
+async function seciliGonder(){
+  const secili=[...document.querySelectorAll('.gsec:checked')].map(c=>c.value);
+  if(!secili.length){alert('Önce listeden en az bir cari seçin.');return;}
+  const r=await fetch('/api/gonder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secili})});
+  const g=await r.json();
+  veri[6]=await (await fetch('/api/takip')).json(); takipCiz(); gonderimOzet(g);
+}
+async function raporDetay(cari,key){
+  const el=document.getElementById('rd_'+key); if(!el) return;
+  if(el.dataset.acik==='1'){el.style.display='none';el.dataset.acik='0';return;}
+  el.style.display='';el.dataset.acik='1';
+  el.innerHTML=`<td colspan="8"><div class="loader">Yüklenen ekstre okunuyor, iki tarafın eksikleri çıkarılıyor…</div></td>`;
+  const d=await (await fetch('/api/itiraz?cari='+encodeURIComponent(cari))).json();
+  if(!d.parse){el.innerHTML=`<td colspan="8" style="color:var(--soluk)">${d.mesaj||d.hata||'Analiz yapılamadı.'}</td>`;return;}
+  const sut=(bas,arr,col)=>`<div class="aksut">
+     <div class="akbas" style="color:${col}">${bas} <span>(${arr.length})</span></div>
+     ${arr.length?arr.map(x=>`<div class="akrow" style="border-left-color:${col}">${x.ac}</div>`).join(''):'<div class="akbos">— yok —</div>'}</div>`;
+  el.innerHTML=`<td colspan="8"><div class="ikili">
+     ${sut('🟠 KARŞI TARAF tamamlayacak',d.karsi_eksik,'var(--turuncu)')}
+     ${sut('🔴 BİZ tamamlayacağız',d.biz_eksik,'var(--kirmizi)')}
+     ${sut('⚖️ Tutar farkı — GİB hakem',d.tutar_farki,'var(--mavi)')}
+   </div>${d.mutabik
+     ? '<div class="farkb ok" style="margin-top:10px">İki ekstre örtüştü — fark 0. Karşı taraf onayıyla MUTABIK olur.</div>'
+     : `<div class="mut" style="margin-top:10px">Karşı ekstrede ${d.karsi_satir} satır okundu. Her iki taraf eksiğini tamamlayıp yeniden mutabakat çalışınca fark 0 → <b>Mutabıkız</b> işaretlenir.</div>`}</td>`;
+}
+
+// ---- Manuel eşleştirme / kapatma (Triyaj drill-down) ----
+let _farkCari=null;
+async function farkAc(ck,adi){
+  _farkCari=ck;
+  const el=document.getElementById('farkDetay'); if(!el) return;
+  el.innerHTML='<div class="loader">Farklar getiriliyor…</div>';
+  let d; try{ d=await (await fetch('/api/cari_fark?cari='+encodeURIComponent(ck))).json(); }
+  catch(e){ el.innerHTML='<div class="bos">Sunucu hatası.</div>'; return; }
+  const item=(x,side,col)=>`<label class="akrow" style="border-left-color:${col};display:flex;gap:8px;align-items:flex-start;cursor:pointer">
+     <input type="checkbox" class="fsec" data-id="${x.id}" data-side="${side}" style="margin-top:3px">
+     <span>${x.ac}</span></label>`;
+  const sut=(bas,arr,side,col)=>`<div class="aksut">
+     <div class="akbas" style="color:${col}">${bas} <span>(${arr.length})</span></div>
+     ${arr.length?arr.map(x=>item(x,side,col)).join(''):'<div class="akbos">— yok —</div>'}</div>`;
+  const man=(d.manuel||[]).map(m=>`<div class="akrow" style="border-left-color:var(--soluk);display:flex;justify-content:space-between;gap:8px">
+     <span>${m.tip==='cift'?'⇄ ':'🔒 '}${m.ac}${m.not?` <i style="color:var(--soluk)">— ${m.not}</i>`:''}</span>
+     <button class="btn ghost" style="padding:2px 8px;font-size:12px" onclick="manuelGeri('${m.id}')">↩ geri al</button></div>`).join('');
+  const dv=d.devir||{};
+  const devirHtml = dv.var ? `<div class="akrow" style="border-left-color:${dv.mutabik?'var(--yesil)':'var(--kirmizi)'};margin-bottom:8px">
+       <b>${dv.mutabik?'↻ Devir mutabık':'↻ DEVİR/AÇILIŞ FARKI'}</b> — ${dv.ac}</div>` : '';
+  el.innerHTML=`<div class="kutu">
+     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+       <b>${ck} · ${adi} — elle eşleştir/kapat</b>
+       ${d.mutabik?'<span class="pill" style="background:var(--yesil)">fark kalmadı</span>':''}</div>
+     ${devirHtml}
+     <div class="ikili">
+       ${sut('🟠 KARŞI eksik',d.karsi_eksik,'karsi','var(--turuncu)')}
+       ${sut('🔴 BİZ eksik',d.biz_eksik,'biz','var(--kirmizi)')}
+       ${sut('⚖️ Tutar farkı',d.tutar_farki,'fark','var(--mavi)')}
+     </div>
+     <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+       <input id="farkNot" placeholder="açıklama (örn. yanlış cariye işlenmiş, düzeltildi)" style="flex:1;min-width:200px;padding:7px 10px;border:1px solid var(--cizgi,#ccc);border-radius:8px">
+       <button class="btn pri" onclick="manuelKapat()">🔒 Seçilenleri kapat</button>
+       <button class="btn ghost" onclick="manuelCift()">⇄ Seçili ikisini eşleştir</button>
+     </div>
+     <div style="font-size:11.5px;color:var(--soluk);margin-top:6px">Kapatma/eşleştirme kalıcı kaydedilir, kanıt zincirine işlenir ve motorun otomatik analizinden muaf tutulur.</div>
+     ${man?`<div style="margin-top:10px"><div class="akbas" style="color:var(--soluk)">Elle işlenenler</div>${man}</div>`:''}
+   </div>`;
+}
+function _secilenler(){ return [...document.querySelectorAll('#farkDetay .fsec:checked')]
+  .map(c=>({id:c.dataset.id,side:c.dataset.side})); }
+async function _farkPost(url,body){
+  const r=await (await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({cari:_farkCari,...body})})).json();
+  return r;
+}
+async function manuelKapat(){
+  const sec=_secilenler(); if(!sec.length){ alert('Önce kapatılacak kalemleri işaretleyin.'); return; }
+  const not=(document.getElementById('farkNot')||{}).value||'';
+  const r=await _farkPost('/api/manuel_esle',{kapat:sec.map(s=>s.id),not});
+  if(!r.ok){ alert('Hata: '+(r.hata||'')); return; }
+  const adi=document.querySelector('#farkDetay b')?.textContent.split('—')[0].split('·')[1]?.trim()||'';
+  farkAc(_farkCari,adi);
+}
+async function manuelCift(){
+  const sec=_secilenler();
+  const biz=sec.filter(s=>s.side==='biz'), karsi=sec.filter(s=>s.side==='karsi');
+  if(!(biz.length===1&&karsi.length===1)){ alert('Eşleştirmek için BİZ tarafından 1, KARŞI tarafından 1 kalem seçin.'); return; }
+  const not=(document.getElementById('farkNot')||{}).value||'';
+  const r=await _farkPost('/api/manuel_esle',{cift:[[biz[0].id,karsi[0].id]],not});
+  if(!r.ok){ alert('Hata: '+(r.hata||'')); return; }
+  const adi=document.querySelector('#farkDetay b')?.textContent.split('—')[0].split('·')[1]?.trim()||'';
+  farkAc(_farkCari,adi);
+}
+async function manuelGeri(id){
+  const r=await _farkPost('/api/manuel_geri',{id});
+  if(!r.ok){ alert('Hata: '+(r.hata||'')); return; }
+  const adi=document.querySelector('#farkDetay b')?.textContent.split('—')[0].split('·')[1]?.trim()||'';
+  farkAc(_farkCari,adi);
+}
+
+// ---- Çapraz cari (yanlış cariye işleme) uyarı bandı ----
+async function caprazYukle(){
+  const el=document.getElementById('caprazUyari'); if(!el) return;
+  let d; try{ d=await (await fetch('/api/caprazcari')).json(); }catch(e){ return; }
+  const ad=(d.adaylar||[]);
+  if(!ad.length){ el.innerHTML=''; return; }
+  const renk=k=>k==='YÜKSEK'?'var(--kirmizi)':'var(--turuncu)';
+  const rows=ad.map(a=>`<div class="akrow" style="border-left-color:${renk(a.kesinlik)};display:flex;gap:8px;align-items:flex-start">
+     <span class="pill" style="background:${renk(a.kesinlik)};white-space:nowrap">${a.kesinlik}</span>
+     <span>${a.ac} <a href="#" onclick="farkAc('${a.eksik_cari}','${(a.eksik_adi||'').replace(/'/g,'')}');return false">→ ${a.eksik_cari} kartını aç</a></span></div>`).join('');
+  el.innerHTML=`<div class="kutu" style="border:1px solid var(--kirmizi)">
+     <h5 style="margin:2px 0 8px;color:var(--kirmizi)">🔀 Çapraz cari uyarısı — yanlış cariye işlenmiş olabilir (${ad.length})</h5>
+     ${rows}
+     <div style="font-size:11.5px;color:var(--soluk);margin-top:6px">AI bir caride fazla, başka caride aynı tutar/belgenin eksik olduğunu gördü. <b>Öneridir</b>; muhasebeci doğrulayıp düzeltir.</div>
+   </div>`;
+}
+
+pipeCiz();
+</script>
+</body>
+</html>

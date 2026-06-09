@@ -195,7 +195,7 @@
       window.fetch = (...a) => _f(...a).then(r => { if (r.status === 401) location.href = '/giris'; return r; }); })();
     const qs = new URLSearchParams(location.search);
     let DONEM = qs.get('d') || "";
-    function donemDegistir(v) { location.href = '/?d=' + v; }
+    function donemDegistir(v) { location.href = '/ay-kapanis?d=' + v; }
     // Son tarihe gore gecikti / yaklasiyor rozeti (bugune kiyasla).
     function sonTarihHtml(m) {
       if (!m.son_tarih) return '—';

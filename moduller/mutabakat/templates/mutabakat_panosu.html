@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toplu Aylık Mutabakat Panosu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0e1d3d;--yuzey:#172a4d;--yuzey2:#1e3357;--cizgi:rgba(255,255,255,.10);
+    --metin:#f8fafc;--soluk:#94a3b8;
+    --mavi:#14b8a6;--yesil:#10b981;--kirmizi:#f43f5e;--turuncu:#f59e0b;--mor:#6366f1;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter','Segoe UI',-apple-system,Arial,sans-serif;background:
+    radial-gradient(900px 500px at 0% 0%,rgba(20,184,166,.16),transparent 55%),
+    radial-gradient(800px 500px at 100% 0%,rgba(16,185,129,.12),transparent 55%),
+    radial-gradient(700px 500px at 50% 100%,rgba(245,158,11,.06),transparent 55%),var(--bg);
+    color:var(--metin);min-height:100vh;padding:28px clamp(16px,4vw,56px)}
+  .wrap{max-width:1240px;margin:0 auto}
+  header.top{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px;margin-bottom:18px}
+  h1{font-family:'Outfit',sans-serif;font-size:clamp(20px,3vw,28px);font-weight:800;letter-spacing:-.5px}
+  h1 span{color:var(--mavi)}
+  .alt{color:var(--soluk);font-size:13px;margin-top:4px}
+  .donemkutu{text-align:right;font-size:13px;color:var(--soluk)}
+  .donemkutu b{color:var(--metin);font-size:15px}
+
+  .modbar{display:flex;gap:8px;margin-bottom:20px;background:var(--yuzey);border:1px solid var(--cizgi);
+    border-radius:12px;padding:6px;width:fit-content}
+  .mb{background:transparent;border:none;color:var(--soluk);padding:9px 18px;border-radius:8px;
+    cursor:pointer;font-size:13.5px;font-weight:700;transition:.15s}
+  .mb:hover{color:var(--metin)}
+  .mb.akt{background:var(--mavi);color:#06101f}
+  .mb.kilit{opacity:.45;cursor:not-allowed}
+  .mb.kilit:hover{color:var(--soluk)}
+
+  .kpi{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:22px}
+  @media(max-width:920px){.kpi{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:560px){.kpi{grid-template-columns:repeat(2,1fr)}}
+  .k{background:var(--yuzey);border:1px solid var(--cizgi);border-radius:14px;padding:16px;position:relative;overflow:hidden}
+  .k::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--mavi)}
+  .k.g::before{background:var(--yesil)}.k.r::before{background:var(--kirmizi)}
+  .k.o::before{background:var(--turuncu)}.k.m::before{background:var(--mor)}
+  .k b{display:block;font-size:clamp(20px,3vw,28px);font-weight:800;line-height:1}
+  .k span{color:var(--soluk);font-size:12px;margin-top:6px;display:block}
+
+  .arac{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+  .filtreler{display:flex;gap:6px;flex-wrap:wrap}
+  .ft{background:var(--yuzey);border:1px solid var(--cizgi);color:var(--soluk);padding:8px 16px;
+    border-radius:30px;cursor:pointer;font-size:13px;font-weight:600;transition:.15s}
+  .ft:hover{border-color:var(--mavi);color:var(--metin)}
+  .ft.akt{background:var(--mavi);border-color:var(--mavi);color:#06101f}
+  .ara{margin-left:auto;background:var(--yuzey);border:1px solid var(--cizgi);color:var(--metin);
+    padding:9px 14px;border-radius:10px;font-size:13px;min-width:230px;outline:none}
+  .ara:focus{border-color:var(--mavi)}
+  .btn{border:none;border-radius:10px;padding:10px 18px;font-size:13.5px;font-weight:700;cursor:pointer;transition:.15s}
+  .btn.pri{background:var(--mavi);color:#06101f}.btn.pri:hover{filter:brightness(1.1)}
+  .btn.ghost{background:var(--yuzey);border:1px solid var(--cizgi);color:var(--metin)}
+  .btn.ghost:hover{border-color:var(--mavi)}
+  .sayim{color:var(--soluk);font-size:13px}
+  .sayim b{color:var(--metin)}
+  .sonuc{background:rgba(16,185,129,.14);color:#6ee7b7;border-radius:10px;padding:12px 16px;
+    font-size:13.5px;margin-bottom:14px;font-weight:600;display:none}
+  .resendbar{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:10px;
+    margin-top:4px;padding-top:12px;border-top:1px solid var(--cizgi)}
+
+  .capraz{background:rgba(99,102,241,.10);border:1px solid rgba(99,102,241,.40);
+    border-radius:12px;padding:14px 16px;margin-bottom:16px}
+  .capraz h4{font-size:13.5px;color:#a5b4fc;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .capsat{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:9px;
+    background:var(--yuzey2);border-left:3px solid var(--mor);margin-bottom:8px;font-size:12.8px;line-height:1.55}
+  .capsat:last-child{margin-bottom:0}
+  .capker{flex-shrink:0;padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:800;
+    background:rgba(244,63,94,.18);color:#fda4af;white-space:nowrap}
+  .capsat a{color:#7fe0d6;font-weight:700;text-decoration:none;white-space:nowrap}
+  .capsat a:hover{text-decoration:underline}
+  .capnot{font-size:11.5px;color:var(--soluk);margin-top:8px}
+  .devirban{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.40);
+    border-radius:10px;padding:11px 14px;margin-bottom:16px;font-size:13px;line-height:1.55;color:#fcd34d}
+  .devirban b{color:#ffd596}
+
+  .mailh{display:flex;align-items:center;gap:7px;font-size:12.5px}
+  .madr{color:var(--metin)}
+  .mrz{padding:2px 7px;border-radius:20px;font-size:10px;font-weight:800;letter-spacing:.3px}
+  .mrz.erp{background:rgba(139,152,165,.16);color:var(--soluk)}
+  .mrz.elle{background:rgba(20,184,166,.18);color:#7fe0d6}
+  .medit{background:transparent;border:none;color:var(--soluk);cursor:pointer;font-size:13px;
+    padding:2px 4px;border-radius:6px}
+  .medit:hover{color:var(--mavi);background:rgba(20,184,166,.12)}
+
+  .btn.canli{background:rgba(99,102,241,.16);border:1px solid rgba(99,102,241,.4);color:#a5b4fc}
+  .btn.canli:hover{background:rgba(99,102,241,.26)}
+
+  .tabkutu{background:var(--yuzey);border:1px solid var(--cizgi);border-radius:14px;overflow:hidden}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--cizgi);font-size:13.5px;white-space:nowrap}
+  th{color:var(--soluk);font-size:11px;text-transform:uppercase;letter-spacing:.6px;font-weight:700;
+    background:var(--yuzey2);position:sticky;top:0;cursor:pointer;user-select:none}
+  th.nos{cursor:default}
+  th .ok{opacity:.5;font-size:10px}
+  td.sag,th.sag{text-align:right;font-variant-numeric:tabular-nums}
+  tbody tr:hover{background:#172230}
+  tbody tr.cikar{opacity:.4}
+  tbody tr.cikar .firma{text-decoration:line-through}
+  tbody tr:last-child td{border-bottom:none}
+  .firma{font-weight:600}
+  .kod{color:var(--soluk);font-size:12px}
+  .fark0{color:var(--soluk)}
+  .farkpoz{color:var(--turuncu);font-weight:700}
+  .pill{display:inline-block;padding:4px 11px;border-radius:30px;font-size:11.5px;font-weight:700}
+  .pill.mut{background:rgba(16,185,129,.16);color:#6ee7b7}
+  .pill.itz{background:rgba(244,63,94,.16);color:#fda4af}
+  .pill.bek{background:rgba(139,152,165,.16);color:var(--soluk)}
+  .pill.gon{background:rgba(20,184,166,.16);color:#7fe0d6}
+  .pill.har{background:rgba(139,152,165,.12);color:var(--soluk)}
+  .yanit{font-size:12.5px}
+  .yanit .kanal{font-size:11px;color:var(--soluk)}
+  .bos{color:var(--soluk);opacity:.6}
+  .tur{font-size:12px;color:var(--soluk)}
+  input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--mavi)}
+  tfoot td{font-weight:700;background:var(--yuzey2);border-top:2px solid var(--cizgi)}
+  .yokkayit{padding:30px;text-align:center;color:var(--soluk)}
+  .acikbtn{background:rgba(244,63,94,.14);border:1px solid rgba(244,63,94,.3);color:#fda4af;
+    padding:6px 12px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;transition:.15s}
+  .acikbtn:hover{background:rgba(244,63,94,.24)}
+  /* Aciklama ekrani (modal) */
+  .modalbg{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;
+    justify-content:center;z-index:50;padding:20px}
+  .modalbg.acik{display:flex}
+  .modal{background:var(--yuzey);border:1px solid var(--cizgi);border-radius:16px;max-width:960px;
+    width:100%;max-height:86vh;overflow:auto;padding:24px 26px;position:relative}
+  .mkapat{position:absolute;top:16px;right:16px;background:var(--yuzey2);border:1px solid var(--cizgi);
+    color:var(--metin);width:34px;height:34px;border-radius:9px;cursor:pointer;font-size:15px}
+  .mkapat:hover{border-color:var(--kirmizi);color:var(--kirmizi)}
+  .mbas h2{font-size:20px;font-weight:800;margin-bottom:4px}
+  .mbas .msub{color:var(--soluk);font-size:13px;margin-bottom:18px}
+  .meksik{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:760px){.meksik{grid-template-columns:1fr}}
+  .mkol{background:var(--bg);border:1px solid var(--cizgi);border-radius:12px;padding:14px}
+  .mkol .mkbas{font-weight:800;font-size:13px;margin-bottom:10px}
+  .mkol.biz .mkbas{color:#fda4af}.mkol.karsi .mkbas{color:#fcd34d}.mkol.fark .mkbas{color:#7fe0d6}
+  .meks{border-left:3px solid var(--cizgi);padding:9px 11px;border-radius:8px;background:var(--yuzey2);
+    font-size:12.5px;line-height:1.5;margin-bottom:8px;color:var(--metin)}
+  .mkol.biz .meks{border-left-color:var(--kirmizi)}
+  .mkol.karsi .meks{border-left-color:var(--turuncu)}
+  .mkol.fark .meks{border-left-color:var(--mavi)}
+  .meksbos{color:var(--soluk);opacity:.55;font-size:12.5px;padding:6px 0}
+  .mnot{margin-top:18px;color:var(--soluk);font-size:13px;line-height:1.6;
+    border-top:1px solid var(--cizgi);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <a href="muhasebe_ofisi.html" id="gerilink" style="display:none;color:var(--mor);
+        font-size:12.5px;font-weight:700;text-decoration:none;margin-bottom:6px">← Ofis Panosu</a>
+      <h1>Toplu Aylık <span>Mutabakat</span> Panosu</h1>
+      <div class="alt" id="altyazi"></div>
+    </div>
+    <div class="donemkutu">Dönem<br><b id="donemAd">Mayıs 2026</b><br><span id="firmaAd">ÖRNEK SANAYİ A.Ş.</span></div>
+  </header>
+
+  <div class="modbar">
+    <button class="mb akt" data-m="on">1️⃣ İlk Gönderim (gönderim öncesi)</button>
+    <button class="mb kilit" id="mbGuncel" data-m="guncel">🔒 Güncel Durum (yanıtlar geldi)</button>
+  </div>
+
+  <div class="kpi" id="kpi"></div>
+  <div class="arac" id="arac"></div>
+  <div class="sonuc" id="sonuc"></div>
+  <div id="caprazBanner"></div>
+
+  <div class="tabkutu">
+    <table>
+      <thead id="bas"></thead>
+      <tbody id="govde"></tbody>
+      <tfoot id="ayak"></tfoot>
+    </table>
+  </div>
+</div>
+
+<div class="modalbg" id="modalbg" onclick="if(event.target===this)kapatAciklama()">
+  <div class="modal">
+    <button class="mkapat" onclick="kapatAciklama()">✕</button>
+    <div class="mbas" id="mbas"></div>
+    <div class="meksik" id="meksik"></div>
+    <div class="mnot" id="mnot"></div>
+  </div>
+</div>
+
+<script>
+let VERI=[
+ {kod:"120.01",firma:"Demir Çelik Sanayi A.Ş.",      bizim:485200, karsi:485200, durum:"MUTABIK",  yanit:"21.05.2026", kanal:"E-posta",  tur:2, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.02",firma:"Gül Plastik Ltd. Şti.",        bizim:212750, karsi:198400, durum:"ITIRAZLI", yanit:"19.05.2026", kanal:"WhatsApp",  tur:1, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.03",firma:"Ceyhan Lojistik A.Ş.",         bizim:96300,  karsi:96300,  durum:"MUTABIK",  yanit:"18.05.2026", kanal:"E-posta",  tur:1, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.04",firma:"Anadolu Tekstil San. Tic.",    bizim:340000, karsi:340000, durum:"MUTABIK",  yanit:"20.05.2026", kanal:"E-posta",  tur:1, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.05",firma:"Marmara Gıda Sanayi A.Ş.",     bizim:158900, karsi:172300, durum:"ITIRAZLI", yanit:"22.05.2026", kanal:"E-posta",  tur:2, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.06",firma:"Ege Kimya Ltd. Şti.",          bizim:274600, karsi:274600, durum:"MUTABIK",  yanit:"18.05.2026", kanal:"WhatsApp",  tur:1, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.07",firma:"Yıldız Ambalaj San.",          bizim:89450,  karsi:89450,  durum:"MUTABIK",  yanit:"19.05.2026", kanal:"E-posta",  tur:1, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.08",firma:"Bosphorus İnşaat A.Ş.",        bizim:612300, karsi:0,      durum:"BEKLIYOR", yanit:null,         kanal:null,       tur:2, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.09",firma:"Toros Madencilik Ltd.",        bizim:145000, karsi:145000, durum:"MUTABIK",  yanit:"21.05.2026", kanal:"E-posta",  tur:2, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.10",firma:"Karadeniz Balıkçılık A.Ş.",    bizim:67800,  karsi:71200,  durum:"ITIRAZLI", yanit:"20.05.2026", kanal:"WhatsApp",  tur:1, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.11",firma:"Akdeniz Turizm İşletmeleri",   bizim:230500, karsi:230500, durum:"MUTABIK",  yanit:"17.05.2026", kanal:"E-posta",  tur:1, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.12",firma:"Selçuk Otomotiv San. Tic.",    bizim:418900, karsi:418900, durum:"MUTABIK",  yanit:"22.05.2026", kanal:"E-posta",  tur:2, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.13",firma:"Trakya Cam Sanayi A.Ş.",       bizim:305200, karsi:0,      durum:"BEKLIYOR", yanit:null,         kanal:null,       tur:2, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.14",firma:"Fırat Enerji A.Ş.",            bizim:880000, karsi:880000, durum:"MUTABIK",  yanit:"19.05.2026", kanal:"E-posta",  tur:1, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.15",firma:"Konya Un Fabrikası Ltd.",      bizim:124600, karsi:124600, durum:"MUTABIK",  yanit:"18.05.2026", kanal:"WhatsApp",  tur:1, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.16",firma:"Bursa Mobilya San. Tic.",      bizim:76300,  karsi:79900,  durum:"ITIRAZLI", yanit:"21.05.2026", kanal:"E-posta",  tur:2, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.17",firma:"İzmir Elektrik Malzeme A.Ş.",  bizim:199000, karsi:199000, durum:"MUTABIK",  yanit:"20.05.2026", kanal:"E-posta",  tur:1, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.18",firma:"Gaziantep Baharat Ltd.",       bizim:54200,  karsi:0,      durum:"BEKLIYOR", yanit:null,         kanal:null,       tur:1, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.19",firma:"Samsun Tarım Makineleri A.Ş.", bizim:263700, karsi:263700, durum:"MUTABIK",  yanit:"22.05.2026", kanal:"WhatsApp",  tur:2, mail:"samuraycoratekin@gmail.com"},
+ {kod:"120.20",firma:"Ankara Yazılım Ltd. Şti.",     bizim:312000, karsi:312000, durum:"MUTABIK",  yanit:"17.05.2026", kanal:"E-posta",  tur:1, mail:"samuraycoratekin@gmail.com"},
+];
+let AKTIF_MUSTERI="MUK-001", MOTOR_BAGLI=false;  // motor:true mukellefte gercek /api/gonder calisir
+// İtirazlı carilere gelen yanıt sonrası iki ekstrenin karşılaştırma sonucu:
+// biz   = BİZİM tamamlamamız gereken eksikler
+// karsi = KARŞI TARAFIN tamamlaması gereken eksikler
+// fark  = aynı belge iki tarafta farklı tutar (GİB hakemliğinde)
+let EKSIK={
+ "120.02":{
+   biz:[],
+   karsi:["GP-019 · e-Fatura · 14.350,00 ₺ — GİB'de kayıtlı ancak karşı tarafın ekstresinde yok. Karşı taraf bu faturayı defterine işlemeli."],
+   fark:[]},
+ "120.05":{
+   biz:["MG-044 · e-Fatura · 13.400,00 ₺ — GİB'de var, bizim defterimizde yok. Bu alış faturasını biz işlemeliyiz."],
+   karsi:[],
+   fark:[]},
+ "120.10":{
+   biz:["DEKONT-512 · Ödeme · 3.400,00 ₺ — Karşının ekstresinde görünen tahsilat bizim kayıtta yok; banka dekontuyla doğrulanıp işlenmeli."],
+   karsi:[],
+   fark:["KB-077 · bizde 8.600,00 / karşıda 12.000,00 — aynı belge farklı tutar (3.400,00 ₺); GİB ile teyit edilecek."]},
+ "120.16":{
+   biz:[],
+   karsi:["BM-198 · e-Arşiv · 1.250,00 ₺ — bizim ekstrede var, karşıda yok."],
+   fark:["BM-203 · bizde 5.400,00 / GİB 9.000,00 — bizim kayıt eksik girilmiş (3.600,00 ₺ fark), düzeltilecek."]},
+};
+// ÇAPRAZ CARİ: bir caride FAZLA, başka caride aynı belge/tutarın EKSİK olması →
+// "yanlış cariye işlenmiş" adayı. AI önerir, muhasebeci onaylayıp taşır.
+let CAPRAZ=[
+ {kesinlik:"YÜKSEK", belge:"BM-198 · e-Arşiv · 1.250,00 ₺",
+  fazla_kod:"120.16", fazla_firma:"Bursa Mobilya San. Tic.",
+  eksik_kod:"120.05", eksik_firma:"Marmara Gıda Sanayi A.Ş.",
+  ac:"1.250,00 ₺ tutarındaki BM-198 belgesi 120.16 Bursa Mobilya kartına işlenmiş; "+
+     "ama 120.05 Marmara Gıda tarafında bu tutar eksik. Belge no ve tutar birebir eşleşiyor "+
+     "→ muhtemelen yanlış cariye işlendi, 120.05'e taşınmalı."},
+];
+// DEVİR / AÇILIŞ BAKİYE FARKI: iki tarafın devir net'i farklıysa her dönem aynı tutar kayar.
+let DEVIR={
+ "120.10":{biz:45000, karsi:41600, fark:3400,
+   ac:"Devir/açılış bakiyesi: bizdeki açılış 45.000,00 / karşıdaki 41.600,00 → fark 3.400,00 ₺. "+
+      "Cari içi hareketler tutsa bile bakiye her dönem bu tutar kadar kayar; önce devir mutabakatı şart."},
+};
+// Canli akisi AYRI sayfada (pipeline) acar — panel kalabaliklasmaz
+function canliIzle(tip,n){
+  const u=`canli_akis.html?tip=${tip}&n=${n}`;
+  window.open(u,"canliAkis","width=1100,height=680");
+}
+const TL=n=>n.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+// ---- Karşı taraf maili: ERP cari kartı (VERI.mail) = varsayılan, elle override = yapışkan ----
+// Gerçek/canlı kurulumda mail kaynağı ERP cari kartı olacak (ERP entegrasyonu gerekecek).
+const MAIL_KEY="mutabakat_mail_override";
+function mailOverrides(){ try{return JSON.parse(localStorage.getItem(MAIL_KEY)||"{}");}catch(e){return {};} }
+function erpMail(kod){ const r=VERI.find(x=>x.kod===kod); return r?(r.mail||""):""; }
+function mailGet(kod){ const o=mailOverrides()[kod]; return o?o.mail:erpMail(kod); }
+function mailKaynak(kod){ return mailOverrides()[kod]?"elle":"ERP"; }
+function mailDuzenle(kod){
+  const cur=mailGet(kod);
+  const yeni=prompt("Cari "+kod+" — mutabakat e-postası:\n"+
+    "(ERP cari kartından geldi. Değiştirirsen son güncel kalır; boş bırakırsan ERP'ye döner.)", cur);
+  if(yeni===null) return;
+  const v=yeni.trim();
+  if(v && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)){ alert("Geçerli bir e-posta adresi girin."); return; }
+  const o=mailOverrides();
+  if(v==="" || v===erpMail(kod)){ delete o[kod]; }            // ERP varsayılanına dön
+  else { o[kod]={mail:v, zaman:new Date().toLocaleString('tr-TR')}; }  // yapışkan override
+  localStorage.setItem(MAIL_KEY, JSON.stringify(o));
+  ciz();
+}
+function mailHucre(kod){
+  const m=mailGet(kod), k=mailKaynak(kod);
+  const rz = k==="elle"
+    ? '<span class="mrz elle" title="Elle güncellendi — ERP değişse bile bu kalır">elle</span>'
+    : '<span class="mrz erp" title="ERP cari kartından geldi">ERP</span>';
+  return `<div class="mailh"><span class="madr">${m||'<span class="bos">— yok —</span>'}</span>${rz}`+
+    `<button class="medit" title="Maili düzenle" onclick="mailDuzenle('${kod}')">✎</button></div>`;
+}
+const fark=r=>r.durum==="BEKLIYOR"?null:(r.bizim-r.karsi);
+const etiket={MUTABIK:["mut","Mutabık 🔒"],ITIRAZLI:["itz","İtirazlı"],BEKLIYOR:["bek","Yanıt bekleniyor"]};
+
+let mod="on";                          // "on" = ilk gonderim, "guncel" = yanitlar geldi
+let filtre="hepsi", arama="", sira={a:"firma",yon:1};
+// "Guncel Durum" sekmesi, ilk gonderim yapilana kadar kilitli kalir.
+// Hangi firma icin gonderim yapildigi localStorage'da firma koduyla saklanir.
+const _gKod="mut_gonderildi_"+(new URLSearchParams(location.search).get("kod")||"ana");
+let gonderildiMi = localStorage.getItem(_gKod)==="1";
+function guncelKilidiYenile(){
+  const btn=document.getElementById("mbGuncel"); if(!btn) return;
+  if(gonderildiMi){ btn.classList.remove("kilit"); btn.textContent="📊 Güncel Durum (yanıtlar geldi)"; }
+  else{ btn.classList.add("kilit"); btn.textContent="🔒 Güncel Durum (yanıtlar geldi)"; }
+}
+let secili=new Set();   // ilk gonderimde gonderilecek cariler
+const tekrarUygun=r=>r.durum==="ITIRAZLI"||r.durum==="BEKLIYOR";  // mutabik kilitli, tekrar gitmez
+// Varsayilan: yalniz yanit BEKLEYENLER secili gelir. Itirazlilar opsiyonel — tik bos baslar,
+// gondermek istersen elle secersin.
+let seciliG=new Set();  // tekrar gonderimde secili cariler
+// VERI her degistiginde (motor verisi / kurgu / hardcoded showcase) secimleri yeniden kur.
+function seciliKur(){
+  secili=new Set(VERI.map(r=>r.kod));
+  seciliG=new Set(VERI.filter(r=>r.durum==="BEKLIYOR").map(r=>r.kod));
+}
+
+/* ---------- MOD: ILK GONDERIM ---------- */
+function onKpi(){
+  const sec=VERI.filter(r=>secili.has(r.kod));
+  const tutar=sec.reduce((s,r)=>s+r.bizim,0);
+  const k=[
+    ["",VERI.length,"toplam cari"],
+    ["m",sec.length,"gönderilecek (seçili)"],
+    ["o",VERI.length-sec.length,"hariç tutulan"],
+    ["g","₺"+TL(tutar),"gönderilecek bakiye"],
+  ];
+  document.getElementById("kpi").innerHTML=k.map(([c,v,s])=>
+    `<div class="k ${c}"><b>${v}</b><span>${s}</span></div>`).join("");
+}
+function onArac(){
+  const sec=VERI.filter(r=>secili.has(r.kod)).length;
+  document.getElementById("arac").innerHTML=`
+    <button class="btn ghost" onclick="hepsiSec(true)">Tümünü seç</button>
+    <button class="btn ghost" onclick="hepsiSec(false)">Hiçbiri</button>
+    <span class="sayim"><b>${sec}</b> / ${VERI.length} cari seçili</span>
+    <button class="btn canli" style="margin-left:auto" onclick="canliIzle('ilk',${sec})">▶ Canlı İzle</button>
+    <button class="btn pri" onclick="gonder()">📤 Seçili ${sec} cariye mutabakat formu gönder</button>
+    <input class="ara" id="ara" placeholder="🔍 Firma veya cari kodu ara…" value="${arama}" style="margin-left:0">`;
+  document.getElementById("ara").addEventListener("input",e=>{arama=e.target.value.trim();ciz();});
+}
+function onTablo(){
+  const rows=filtreSirala();
+  document.getElementById("bas").innerHTML=`<tr>
+     <th class="nos"><input type="checkbox" id="topsec" onclick="hepsiSec(this.checked)"></th>
+     <th data-s="kod">Cari <span class="ok">↕</span></th>
+     <th data-s="firma">Firma <span class="ok">↕</span></th>
+     <th class="nos">Mutabakat Maili</th>
+     <th class="sag" data-s="bizim">Bizim Bakiye <span class="ok">↕</span></th>
+     <th data-s="durum">Gönderim Durumu <span class="ok">↕</span></th></tr>`;
+  baslikSirala();
+  const g=document.getElementById("govde");
+  g.innerHTML=rows.map(r=>{
+    const on=secili.has(r.kod);
+    return `<tr class="${on?'':'cikar'}">
+      <td><input type="checkbox" ${on?'checked':''} onclick="tikle('${r.kod}',this.checked)"></td>
+      <td class="kod">${r.kod}</td>
+      <td class="firma">${r.firma}</td>
+      <td>${mailHucre(r.kod)}</td>
+      <td class="sag">${TL(r.bizim)}</td>
+      <td>${on?'<span class="pill gon">Gönderilecek</span>':'<span class="pill har">Hariç tutuldu</span>'}</td>
+    </tr>`;
+  }).join("");
+  const tb=rows.filter(r=>secili.has(r.kod)).reduce((s,r)=>s+r.bizim,0);
+  document.getElementById("ayak").innerHTML=
+    `<tr><td colspan="4">SEÇİLİ TOPLAM</td><td class="sag">${TL(tb)}</td><td></td></tr>`;
+  const ts=document.getElementById("topsec");
+  if(ts) ts.checked = rows.length>0 && rows.every(r=>secili.has(r.kod));
+}
+function tikle(kod,on){on?secili.add(kod):secili.delete(kod);onKpi();onArac();onTablo();}
+function hepsiSec(on){
+  filtreSirala().forEach(r=>on?secili.add(r.kod):secili.delete(r.kod));
+  onKpi();onArac();onTablo();
+}
+async function gonder(){
+  const sec=VERI.filter(r=>secili.has(r.kod));
+  if(!sec.length){alert("Önce göndermek istediğin carileri seç.");return;}
+  const s=document.getElementById("sonuc"); s.style.display="block";
+  if(MOTOR_BAGLI){
+    s.innerHTML="📤 Gönderiliyor…";
+    let r;
+    try{
+      r=await fetch("/api/gonder",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({musteri:AKTIF_MUSTERI,secili:sec.map(x=>x.kod)})}).then(x=>x.json());
+    }catch(e){ s.innerHTML="⚠️ Gönderim hatası: "+e; return; }
+    const gon=r.gonderilen||[], atl=r.atlanan||[];
+    const ok=gon.filter(g=>g.mail_ok).length, hata=gon.filter(g=>!g.mail_ok);
+    canliIzle("ilk", sec.length);
+    s.innerHTML=`📤 <b>${gon.length} cariye</b> mutabakat formu gönderildi (${r.tur}. tur). `+
+      `✉️ <b>${ok}</b> e-posta iletildi`+
+      (hata.length?` · ⚠️ <b>${hata.length}</b> mailde hata: ${hata[0].mail_hata}`:``)+
+      (atl.length?` · ${atl.length} cari hariç tutuldu (zaten yanıtlamış).`:``)+
+      ` Yanıtlar geldikçe <b>“Güncel Durum”</b> sekmesine düşecek.`;
+  } else {
+    canliIzle("ilk", sec.length);
+    s.innerHTML=`📤 <b>${sec.length} cariye</b> mutabakat formu gönderildi (1. gönderim). `+
+      `${VERI.length-sec.length} cari hariç tutuldu. `+
+      `<i>(Demo mükellef — gerçek e-posta yalnızca motora bağlı mükellefte gider.)</i>`;
+  }
+  // Ilk gonderim yapildi → "Guncel Durum" sekmesinin kilidi acilir.
+  gonderildiMi=true; localStorage.setItem(_gKod,"1"); guncelKilidiYenile();
+}
+
+/* ---------- MOD: GUNCEL DURUM ---------- */
+function guncelKpi(){
+  const m=VERI.filter(r=>r.durum==="MUTABIK").length;
+  const i=VERI.filter(r=>r.durum==="ITIRAZLI").length;
+  const b=VERI.filter(r=>r.durum==="BEKLIYOR").length;
+  const oran=Math.round((m+i)/VERI.length*100);
+  const tf=VERI.reduce((s,r)=>s+Math.abs(fark(r)||0),0);
+  const k=[["",VERI.length,"toplam cari"],["g",m,"mutabık"],["r",i,"itirazlı"],
+    ["o",b,"yanıt bekliyor"],["m","%"+oran,"yanıt oranı"],["r","₺"+TL(tf),"toplam fark"]];
+  document.getElementById("kpi").innerHTML=k.map(([c,v,s])=>
+    `<div class="k ${c}"><b>${v}</b><span>${s}</span></div>`).join("");
+}
+function guncelArac(){
+  const sec=VERI.filter(r=>seciliG.has(r.kod)).length;
+  const uygun=VERI.filter(tekrarUygun).length;
+  document.getElementById("arac").innerHTML=`
+    <div class="filtreler" id="filtreler">
+      <button class="ft ${filtre==='hepsi'?'akt':''}" data-f="hepsi">Tümü</button>
+      <button class="ft ${filtre==='MUTABIK'?'akt':''}" data-f="MUTABIK">Mutabık</button>
+      <button class="ft ${filtre==='ITIRAZLI'?'akt':''}" data-f="ITIRAZLI">İtirazlı</button>
+      <button class="ft ${filtre==='BEKLIYOR'?'akt':''}" data-f="BEKLIYOR">Bekliyor</button>
+    </div>
+    <input class="ara" id="ara" placeholder="🔍 Firma veya cari kodu ara…" value="${arama}">
+    <div class="resendbar">
+      <span class="sayim">Tekrar gönderim — <b>${sec}</b> / ${uygun} cari seçili
+        <span class="bos">(yanıt bekleyenler varsayılan seçili · itirazlılar opsiyonel · mutabık 🔒 kilitli)</span></span>
+      <button class="btn ghost" onclick="hepsiSecG(true)">Uygun olanların hepsi</button>
+      <button class="btn ghost" onclick="hepsiSecG(false)">Hiçbiri</button>
+      <button class="btn canli" style="margin-left:auto" onclick="canliIzle('tekrar',${sec})">▶ Canlı İzle</button>
+      <button class="btn pri" onclick="tekrarGonder()">🔁 Seçili ${sec} cariye tekrar gönder</button>
+    </div>`;
+  document.getElementById("filtreler").addEventListener("click",e=>{
+    const b=e.target.closest(".ft"); if(!b)return; filtre=b.dataset.f; ciz();
+  });
+  document.getElementById("ara").addEventListener("input",e=>{arama=e.target.value.trim();ciz();});
+}
+function tikleG(kod,on){on?seciliG.add(kod):seciliG.delete(kod);guncelArac();guncelTablo();}
+function hepsiSecG(on){
+  let rows=filtreSirala().filter(tekrarUygun);
+  if(filtre!=="hepsi") rows=rows.filter(r=>r.durum===filtre);
+  rows.forEach(r=>on?seciliG.add(r.kod):seciliG.delete(r.kod));
+  guncelArac();guncelTablo();
+}
+async function tekrarGonder(){
+  const sec=VERI.filter(r=>seciliG.has(r.kod));
+  if(!sec.length){alert("Önce tekrar göndermek istediğin carileri seç (itirazlı / yanıt bekleyen).");return;}
+  const itz=sec.filter(r=>r.durum==="ITIRAZLI").length;
+  const bek=sec.filter(r=>r.durum==="BEKLIYOR").length;
+  const s=document.getElementById("sonuc"); s.style.display="block";
+  if(MOTOR_BAGLI){
+    s.innerHTML="🔁 Tekrar gönderiliyor…";
+    let r;
+    try{
+      r=await fetch("/api/gonder",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({musteri:AKTIF_MUSTERI,secili:sec.map(x=>x.kod)})}).then(x=>x.json());
+    }catch(e){ s.innerHTML="⚠️ Gönderim hatası: "+e; return; }
+    const gon=r.gonderilen||[], atl=r.atlanan||[];
+    const ok=gon.filter(g=>g.mail_ok).length, hata=gon.filter(g=>!g.mail_ok);
+    canliIzle("tekrar", sec.length);
+    s.innerHTML=`🔁 <b>${gon.length} cariye</b> mutabakat formu tekrar gönderildi `+
+      `(${r.tur}. tur · ${bek} bekleyen + ${itz} itirazlı). `+
+      `✉️ <b>${ok}</b> e-posta iletildi`+
+      (hata.length?` · ⚠️ <b>${hata.length}</b> mailde hata: ${hata[0].mail_hata}`:``)+
+      (atl.length?` · ${atl.length} cariye gitmedi (mükerrer önlendi).`:``);
+  } else {
+    canliIzle("tekrar", sec.length);
+    s.innerHTML=`🔁 <b>${sec.length} cariye</b> mutabakat formu tekrar gönderildi `+
+      `(${bek} yanıt bekleyen + ${itz} itirazlı). `+
+      `Mutabık olan ${VERI.filter(r=>r.durum==="MUTABIK").length} cariye <b>tekrar gitmedi</b> — mükerrer önlendi.`;
+  }
+}
+function guncelTablo(){
+  let rows=filtreSirala();
+  if(filtre!=="hepsi") rows=rows.filter(r=>r.durum===filtre);
+  document.getElementById("bas").innerHTML=`<tr>
+     <th class="nos"><input type="checkbox" id="topsecg" onclick="hepsiSecG(this.checked)" title="Uygun olanların hepsini seç"></th>
+     <th data-s="kod">Cari <span class="ok">↕</span></th>
+     <th data-s="firma">Firma <span class="ok">↕</span></th>
+     <th class="nos">Mutabakat Maili</th>
+     <th class="sag" data-s="bizim">Bizim Bakiye <span class="ok">↕</span></th>
+     <th class="sag" data-s="karsi">Karşı Bakiye <span class="ok">↕</span></th>
+     <th class="sag" data-s="fark">Fark <span class="ok">↕</span></th>
+     <th data-s="durum">Durum <span class="ok">↕</span></th>
+     <th data-s="yanit">Gelen Yanıt <span class="ok">↕</span></th>
+     <th class="nos">Açıklama</th>
+     <th data-s="tur">Gönderim <span class="ok">↕</span></th></tr>`;
+  baslikSirala();
+  const g=document.getElementById("govde");
+  if(!rows.length){g.innerHTML=`<tr><td colspan="11" class="yokkayit">Kayıt bulunamadı.</td></tr>`;
+    document.getElementById("ayak").innerHTML="";return;}
+  g.innerHTML=rows.map(r=>{
+    const [cls,txt]=etiket[r.durum]; const f=fark(r);
+    const farkHtml=f===null?`<span class="bos">—</span>`
+      :Math.abs(f)<=0.01?`<span class="fark0">0,00</span>`:`<span class="farkpoz">${TL(Math.abs(f))}</span>`;
+    const yanitHtml=r.yanit?`<div class="yanit">${r.yanit}<div class="kanal">${r.kanal}</div></div>`
+      :`<span class="bos">yanıt yok</span>`;
+    const tikHtml=tekrarUygun(r)
+      ?`<input type="checkbox" ${seciliG.has(r.kod)?'checked':''} onclick="tikleG('${r.kod}',this.checked)" title="Tekrar gönderime seç">`
+      :`<span title="Mutabık — kilitli">🔒</span>`;
+    const acikHtml=r.durum==="ITIRAZLI"
+      ?`<button class="acikbtn" onclick="acAciklama('${r.kod}')">📋 Eksikleri gör</button>`
+      :`<span class="bos">—</span>`;
+    return `<tr>
+      <td>${tikHtml}</td>
+      <td class="kod">${r.kod}</td><td class="firma">${r.firma}</td>
+      <td>${mailHucre(r.kod)}</td>
+      <td class="sag">${TL(r.bizim)}</td>
+      <td class="sag">${r.durum==="BEKLIYOR"?'<span class="bos">—</span>':TL(r.karsi)}</td>
+      <td class="sag">${farkHtml}</td>
+      <td><span class="pill ${cls}">${txt}</span></td>
+      <td>${yanitHtml}</td>
+      <td>${acikHtml}</td>
+      <td class="tur">${r.tur}. gönderim</td></tr>`;
+  }).join("");
+  const tb=rows.reduce((s,r)=>s+r.bizim,0);
+  const tk=rows.reduce((s,r)=>s+(r.durum==="BEKLIYOR"?0:r.karsi),0);
+  document.getElementById("ayak").innerHTML=
+    `<tr><td colspan="4">TOPLAM (${rows.length} cari)</td>
+     <td class="sag">${TL(tb)}</td><td class="sag">${TL(tk)}</td><td colspan="5"></td></tr>`;
+  const ts=document.getElementById("topsecg");
+  const uygunRows=rows.filter(tekrarUygun);
+  if(ts) ts.checked = uygunRows.length>0 && uygunRows.every(r=>seciliG.has(r.kod));
+}
+
+/* ---------- ORTAK ---------- */
+function filtreSirala(){
+  let rows=VERI.slice();
+  if(arama){const q=arama.toLocaleLowerCase('tr');
+    rows=rows.filter(r=>r.firma.toLocaleLowerCase('tr').includes(q)||r.kod.includes(q));}
+  const {a,yon}=sira;
+  rows.sort((x,y)=>{
+    let vx=a==="fark"?Math.abs(fark(x)||0):x[a], vy=a==="fark"?Math.abs(fark(y)||0):y[a];
+    if(a==="yanit"){vx=x.yanit||"";vy=y.yanit||"";}
+    if(typeof vx==="string")return vx.localeCompare(vy,'tr')*yon;
+    return (vx-vy)*yon;
+  });
+  return rows;
+}
+function baslikSirala(){
+  document.querySelectorAll("th[data-s]").forEach(th=>{
+    th.addEventListener("click",()=>{
+      const a=th.dataset.s; sira.yon=sira.a===a?-sira.yon:1; sira.a=a; ciz();
+    });
+  });
+}
+function acAciklama(kod){
+  const r=VERI.find(x=>x.kod===kod); const e=EKSIK[kod]||{biz:[],karsi:[],fark:[]};
+  const f=fark(r);
+  const dv=DEVIR[kod];
+  const devirHtml = dv?`<div class="devirban">↻ <b>DEVİR/AÇILIŞ FARKI</b> — ${dv.ac}</div>`:"";
+  const cap=CAPRAZ.find(c=>c.eksik_kod===kod||c.fazla_kod===kod);
+  const capHtml = cap?`<div class="devirban" style="background:rgba(99,102,241,.12);
+       border-color:rgba(99,102,241,.40);color:#a5b4fc">🔀 <b>ÇAPRAZ CARİ</b> — ${cap.ac}</div>`:"";
+  document.getElementById("mbas").innerHTML=
+    `<h2>${r.firma} <span style="color:var(--soluk);font-weight:600;font-size:15px">(${r.kod})</span></h2>
+     <div class="msub">İtirazlı yanıt · Bizim bakiye ${TL(r.bizim)} ₺ · Karşı bakiye ${TL(r.karsi)} ₺ ·
+       Fark <b style="color:var(--turuncu)">${TL(Math.abs(f))} ₺</b></div>
+     ${devirHtml}${capHtml}`;
+  const kol=(cls,bas,arr)=>`<div class="mkol ${cls}">
+     <div class="mkbas">${bas} (${arr.length})</div>
+     ${arr.length?arr.map(t=>`<div class="meks">${t}</div>`).join(''):'<div class="meksbos">— eksik yok —</div>'}</div>`;
+  document.getElementById("meksik").innerHTML=
+    kol("biz","🔴 BİZ tamamlayacağız",e.biz)+
+    kol("karsi","🟠 KARŞI TARAF tamamlayacak",e.karsi)+
+    kol("fark","⚖️ Tutar farkı — GİB hakem",e.fark);
+  const toplam=e.biz.length+e.karsi.length+e.fark.length;
+  document.getElementById("mnot").innerHTML=
+    `Toplam <b>${toplam}</b> kalem fark bulundu. Her iki taraf kendi eksiğini tamamlayıp `+
+    `yeniden mutabakat çalıştırıldığında fark <b>0</b>'a iner ve cari <b>Mutabık</b> olur. `+
+    `Bizim eksiğimiz bizim görevimiz, karşı tarafınki ona bildirim olarak düşer.`;
+  document.getElementById("modalbg").classList.add("acik");
+}
+function kapatAciklama(){document.getElementById("modalbg").classList.remove("acik");}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")kapatAciklama();});
+function caprazCiz(){
+  const el=document.getElementById("caprazBanner");
+  if(mod!=="guncel" || !CAPRAZ.length){ el.innerHTML=""; return; }
+  const sat=CAPRAZ.map(c=>`<div class="capsat">
+     <span class="capker">${c.kesinlik}</span>
+     <span>${c.ac} <a onclick="acAciklama('${c.eksik_kod}')" style="cursor:pointer">→ ${c.eksik_kod} kartını aç</a></span>
+   </div>`).join("");
+  el.innerHTML=`<div class="capraz">
+     <h4>🔀 Çapraz cari uyarısı — yanlış cariye işlenmiş olabilir (${CAPRAZ.length})</h4>
+     ${sat}
+     <div class="capnot">AI bir caride fazla, başka caride aynı belge/tutarın eksik olduğunu gördü.
+       <b>Öneridir</b>; muhasebeci doğrulayıp ilgili cariye taşır. Otomatik fiş atılmaz.</div>
+   </div>`;
+}
+function ciz(){ mod==="on"?onTablo():guncelTablo(); }
+function tumCiz(){
+  document.getElementById("altyazi").textContent = mod==="on"
+    ? "Gönderim öncesi: yalnızca bizim bakiyeler. Göndermek istemediğin carilerin tikini kaldır, sonra seçilenlere gönder."
+    : "Yanıtlar geldikçe: karşı bakiye, fark, durum ve gelen yanıtlar burada görünür.";
+  document.getElementById("sonuc").style.display="none";
+  if(mod==="on"){ onKpi(); onArac(); onTablo(); }
+  else{ guncelKpi(); guncelArac(); guncelTablo(); }
+  caprazCiz();
+}
+document.querySelector(".modbar").addEventListener("click",e=>{
+  const b=e.target.closest(".mb"); if(!b)return;
+  if(b.dataset.m==="guncel" && !gonderildiMi){
+    alert("Önce 1. Gönderim sekmesinden seçili carilere mutabakat formunu gönderin. "+
+      "Güncel Durum, gönderim yapıldıktan sonra aktifleşir.");
+    return;
+  }
+  mod=b.dataset.m;
+  document.querySelectorAll(".mb").forEach(x=>x.classList.toggle("akt",x===b));
+  tumCiz();
+});
+// ── Mukellefe ozel cari uretimi ──────────────────────────────────────────
+// Ofis panosundan bir mukellef secilince o mukellefin m/i/b sayilarina
+// birebir uyan, FARKLI cariler uretilir. Kod tohum (seed) olarak kullanildigi
+// icin her mukellef ayni listeyi tekrar tekrar deterministik olarak uretir.
+const KARSI_HAVUZ=[
+ "Yıldız Ambalaj San.","Ceyhan Lojistik A.Ş.","Doruk Metal Ltd.","Pınar Tekstil San.",
+ "Akın Kimya A.Ş.","Deniz Gıda Ltd. Şti.","Boğaziçi Nakliyat","Atlas İnşaat Malz.",
+ "Güneş Elektrik A.Ş.","Çınar Orman Ürünleri","Meriç Cam San.","Toprak Tarım Ltd.",
+ "Mavi Deniz Su Ürünleri","Kervan Turizm","Filiz Otomotiv Yan San.","Hedef Enerji A.Ş.",
+ "Bereket Un Ltd.","Sedef Mobilya San.","Lezzet Baharat Ltd.","Vadi Yazılım A.Ş.",
+ "Kuzey Madencilik","Ipek Plastik Ltd.","Zirve Makine San.","Berrak Su A.Ş.",
+ "Anka Lojistik","Doğan Metal Ltd.","Çağdaş Tekstil","Umut Gıda San.",
+ "Ferah Kimya Ltd.","Pusula Danışmanlık","Granit Yapı Malz.","Şahin Nakliyat A.Ş.",
+];
+function _tohum(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619);} return h>>>0; }
+function _rnd(seed){ let x=seed||123456789; return ()=>{ x^=x<<13; x^=x>>>17; x^=x<<5; x>>>=0; return x/4294967296; }; }
+function verisiUret(kod,m,i,b){
+  const seed=_tohum(kod); const rng=_rnd(seed);
+  const offset=seed % KARSI_HAVUZ.length;
+  const out=[]; let idx=0;
+  const isim=()=>KARSI_HAVUZ[(offset+(idx++))%KARSI_HAVUZ.length];
+  const tutar=()=>Math.round((30000+rng()*900000)/100)*100;
+  const gun=()=>String(15+Math.floor(rng()*8)).padStart(2,"0")+".05.2026";
+  const kanal=()=>rng()<0.7?"E-posta":"WhatsApp";
+  let n=1; const yenikod=()=>kod.split("-").pop()+"."+String(n++).padStart(2,"0");
+  for(let k=0;k<m;k++){ const t=tutar();
+    out.push({kod:yenikod(),firma:isim(),bizim:t,karsi:t,durum:"MUTABIK",yanit:gun(),kanal:kanal(),tur:rng()<0.5?1:2,mail:"samuraycoratekin@gmail.com"}); }
+  for(let k=0;k<i;k++){ const t=tutar(); const sap=Math.round((t*(0.03+rng()*0.12))/100)*100;
+    out.push({kod:yenikod(),firma:isim(),bizim:t,karsi:t-sap,durum:"ITIRAZLI",yanit:gun(),kanal:kanal(),tur:rng()<0.5?1:2,mail:"samuraycoratekin@gmail.com"}); }
+  for(let k=0;k<b;k++){ const t=tutar();
+    out.push({kod:yenikod(),firma:isim(),bizim:t,karsi:0,durum:"BEKLIYOR",yanit:null,kanal:null,tur:rng()<0.5?1:2,mail:"samuraycoratekin@gmail.com"}); }
+  return out;
+}
+
+// ── Motor:true firma (MUK-001) → GERCEK Excel motoru ─────────────────────
+// Ofis panosunda motor:true olan tek mukellef gercek ekstrelere baglidir.
+// Burada VERI/CAPRAZ/EKSIK/DEVIR hardcoded showcase yerine motordan gelir:
+//   /api/triyaj   → cari listesi + bakiye + durum
+//   /api/caprazcari → yanlis cariye islenmis belge adaylari
+//   /api/cari_fark  → her itirazli cari icin biz/karsi eksik + tutar farki + devir
+// Motora erisilemezse mevcut hardcoded VERI ile devam edilir (pano bos kalmaz).
+async function motoraBagla(musteri){
+  const q="?musteri="+encodeURIComponent(musteri);
+  try{
+    const [tr,cz,md]=await Promise.all([
+      fetch("/api/triyaj"+q).then(r=>r.json()),
+      fetch("/api/caprazcari"+q).then(r=>r.json()),
+      fetch("/api/maildurum"+q).then(r=>r.json())
+    ]);
+    if(!tr || !tr.cariler) throw new Error("triyaj bos");
+    const mmap=(md&&md.cariler)||{}, mvar=(md&&md.varsayilan_karsi)||"";
+    VERI = tr.cariler.map(c=>({
+      kod:c.cari, firma:c.adi, bizim:c.bizim_bakiye, karsi:c.karsi_bakiye,
+      durum:(c.durum==="MUTABIK"?"MUTABIK":"ITIRAZLI"),  // AKSIYON = fark var → ITIRAZLI
+      yanit:null, kanal:null, tur:1, mail:(mmap[c.cari]||mvar)  // ERP/cari_mailler'dan cozulen adres (yoksa varsayilan)
+    }));
+    MOTOR_BAGLI=true;
+    CAPRAZ = (cz && cz.adaylar ? cz.adaylar : []).map(a=>({
+      kesinlik:a.kesinlik, fazla_kod:a.fazla_cari, fazla_firma:a.fazla_adi,
+      eksik_kod:a.eksik_cari, eksik_firma:a.eksik_adi,
+      belge:a.belge+" · "+TL(a.tutar)+" ₺", ac:a.ac
+    }));
+    EKSIK={}; DEVIR={};
+    const aksiyon=VERI.filter(r=>r.durum==="ITIRAZLI");
+    await Promise.all(aksiyon.map(async r=>{
+      try{
+        const f=await fetch("/api/cari_fark?cari="+encodeURIComponent(r.kod)+"&musteri="+encodeURIComponent(musteri)).then(x=>x.json());
+        EKSIK[r.kod]={
+          biz:(f.biz_eksik||[]).map(k=>k.ac),
+          karsi:(f.karsi_eksik||[]).map(k=>k.ac),
+          fark:(f.tutar_farki||[]).map(k=>k.ac)
+        };
+        if(f.devir && f.devir.var && !f.devir.mutabik){
+          DEVIR[r.kod]={biz:f.devir.biz, karsi:f.devir.karsi, fark:f.devir.fark, ac:f.devir.ac};
+        }
+      }catch(e){}
+    }));
+  }catch(e){ MOTOR_BAGLI=false; /* motor erisilemedi → hardcoded showcase VERI ile devam */ }
+  seciliKur(); guncelKilidiYenile(); tumCiz();
+}
+
+// Ofis panosundan acilmissa: mukellef adi, donem, cari listesi ve geri baglantisi
+(async function(){
+  const p=new URLSearchParams(location.search);
+  const ad=p.get("ad"), donem=p.get("donem"), kod=p.get("kod");
+  const m=parseInt(p.get("m")), i=parseInt(p.get("i")), b=parseInt(p.get("b"));
+  if(ad){ document.getElementById("firmaAd").textContent=ad;
+    document.getElementById("gerilink").style.display="inline-block"; }
+  if(donem){ document.getElementById("donemAd").textContent=donem; }
+  AKTIF_MUSTERI = kod || "MUK-001";
+  // Motor:true olan HER mukellef gercek Excel motoruna baglanir (registry'den ogrenilir).
+  // Dogrudan acilis (kod yok) = varsayilan motor firmasi.
+  let motorlu = !kod;
+  if(kod){
+    try{
+      const reg=await fetch("/api/mukellefler").then(r=>r.json());
+      const mk=(reg.mukellefler||[]).find(x=>x.kod===kod);
+      motorlu = !!(mk && mk.motor);
+    }catch(e){ motorlu = (kod==="MUK-001"); }
+  }
+  if(motorlu){ await motoraBagla(AKTIF_MUSTERI); return; }
+  // Motor:false mukellefler: m/i/b sayilarina uyan kurgu cari; showcase kapatilir.
+  if(!isNaN(m) && !isNaN(i) && !isNaN(b)){
+    VERI=verisiUret(kod,m,i,b); EKSIK={}; CAPRAZ=[]; DEVIR={};
+  }
+  seciliKur(); guncelKilidiYenile(); tumCiz();
+})();
+</script>
+</body>
+</html>

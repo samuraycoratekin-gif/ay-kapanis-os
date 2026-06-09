@@ -25,6 +25,15 @@ KIRACILAR_JSON = os.path.join(depo.ROOT_VERI, "kiracilar.json")
 TIPLER = {"ofis": "Muhasebe Ofisi", "sirket": "Şirket"}
 _ITERASYON = 200_000
 
+# Satilabilir moduller (urunler). Kiracinin sahip oldugu modul kodlari
+# kayittaki "moduller" listesinde tutulur; capraz satis = bu listeye ekleme.
+MODULLER = {
+    "ay_kapanis": "Ay Kapanış OS",
+    "mutabakat": "Akıllı Mutabakat",
+}
+# Kaydinda "moduller" alani olmayan (eski) kiraci varsayilan olarak bunu alir.
+VARSAYILAN_MODULLER = ["ay_kapanis"]
+
 
 # --------------------------------------------------------------------------- #
 # Parola hash
@@ -70,8 +79,9 @@ def kiraci_getir_eposta(eposta):
     return None
 
 
-def kiraci_ekle(unvan, eposta, parola, tip="ofis", paket="pilot"):
-    """Yeni kiraci olusturur. Eposta benzersiz olmali."""
+def kiraci_ekle(unvan, eposta, parola, tip="ofis", paket="pilot", moduller=None):
+    """Yeni kiraci olusturur. Eposta benzersiz olmali.
+    moduller: sahip olunan urun kodlari; verilmezse VARSAYILAN_MODULLER."""
     eposta = (eposta or "").strip()
     if not eposta or not parola:
         raise ValueError("Eposta ve parola zorunlu.")
@@ -86,6 +96,7 @@ def kiraci_ekle(unvan, eposta, parola, tip="ofis", paket="pilot"):
         "eposta": eposta,
         "parola_hash": _hash_parola(parola),
         "paket": paket,
+        "moduller": _temiz_moduller(moduller),
         "aktif": True,
         "olusturma": datetime.now().strftime("%Y-%m-%d"),
     }
@@ -122,4 +133,44 @@ def dogrula(eposta, parola):
         return None
     if parola_dogrula(parola, k.get("parola_hash", "")):
         return k
+    return None
+
+
+# --------------------------------------------------------------------------- #
+# Moduller (sahip olunan urunler) - capraz satis bayragi
+# --------------------------------------------------------------------------- #
+def _temiz_moduller(liste):
+    """Gecerli modul kodlarini sirayi koruyarak suzer; bos ise varsayilan."""
+    if not liste:
+        return list(VARSAYILAN_MODULLER)
+    temiz = [m for m in liste if m in MODULLER]
+    # tekrarlari at, sirayi koru
+    gorulen, sonuc = set(), []
+    for m in temiz:
+        if m not in gorulen:
+            gorulen.add(m)
+            sonuc.append(m)
+    return sonuc or list(VARSAYILAN_MODULLER)
+
+
+def kiraci_moduller(kiraci_id):
+    """Kiracinin sahip oldugu modul kodlari. Alan yoksa (eski kayit) varsayilan."""
+    k = kiraci_getir(kiraci_id)
+    if not k:
+        return []
+    return _temiz_moduller(k.get("moduller"))
+
+
+def modul_var_mi(kiraci_id, modul_kod):
+    return modul_kod in kiraci_moduller(kiraci_id)
+
+
+def kiraci_moduller_ayarla(kiraci_id, moduller):
+    """Kiracinin modul listesini gunceller (platform sahibi: capraz satis)."""
+    kiracilar = kiracilari_getir()
+    for k in kiracilar:
+        if k["id"] == kiraci_id:
+            k["moduller"] = _temiz_moduller(moduller)
+            depo._yaz(KIRACILAR_JSON, kiracilar)
+            return k
     return None

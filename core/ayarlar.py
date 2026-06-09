@@ -22,7 +22,10 @@ VARSAYILAN = {
     "kurulum_tamam": False,
     "ofis_adi": "Ay Kapanış OS",       # kiraci goruntuleme adi (panoda baslik)
     "erp_tipi": "",                    # en sik kullanilan muhasebe programi (varsayilan)
-    "erp_baglanti": "",               # baglama yontemi: oauth | anahtar | dosya
+    "erp_paket": "",                  # ERP alt-paketi (orn. luca: malimusavir | koza)
+    "erp_baglanti": "",               # baglama yontemi: api | oauth | dosya | yakinda
+    "erp_baglanti_ozet": {},          # SIR olmayan alanlar (endpoint, kullanici) - ekranda gosterilebilir
+    "erp_kimlik_sifreli": "",         # SIR alanlar (sifre/secret) -> kasa ile sifreli; geri dondurulmez
 
     # Donem sonunda mizanda mutlaka hareket/bakiye beklenen kontrol hesaplari.
     # ana_kod -> insana okunur etiket. "Bos" ise SOFT uyari uretilir.
