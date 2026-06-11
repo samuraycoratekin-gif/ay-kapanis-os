@@ -123,7 +123,8 @@
 
     <div class="card">
       <h2><i class="fa-solid fa-list"></i> Kiracılar</h2>
-      <div class="sub">Her kiracının verisi tamamen izoledir. Pasif yapılan kiracı giriş yapamaz.</div>
+      <div class="sub">Her kiracının verisi tamamen izoledir. Pasif = arşiv: kiracı giriş yapamaz, verisi korunur.
+        Kalıcı silme yalnız pasif kiracıda görünür ve ünvan yazılarak onaylanır (tüm veri geri dönüşsüz silinir).</div>
       <table>
         <thead><tr><th>Ünvan</th><th>Tip</th><th>E-posta</th><th>Modüller</th><th>Durum</th><th>Oluşturma</th><th>İşlemler</th></tr></thead>
         <tbody id="tbody"></tbody>
@@ -167,8 +168,12 @@
             onclick="modulToggle('${k.id}','${kod}',${acik})">${acik ? '✓ ' : ''}${esc(ad)}</span>`;
         }).join('');
         const toggle = k.aktif
-          ? `<button class="btn btn-sm btn-warn" onclick="durum('${k.id}',false)"><i class="fa-solid fa-pause"></i> Pasif</button>`
+          ? `<button class="btn btn-sm btn-warn" title="Arşivle: giriş kapanır, veri korunur" onclick="durum('${k.id}',false)"><i class="fa-solid fa-pause"></i> Pasif</button>`
           : `<button class="btn btn-sm btn-ok" onclick="durum('${k.id}',true)"><i class="fa-solid fa-play"></i> Aktif</button>`;
+        // Kalici silme yalniz PASIF (arsiv) kiracida sunulur; varsayilan korunur.
+        const sil = (!k.aktif && k.id !== 'varsayilan')
+          ? `<button class="btn btn-sm btn-danger" title="KALICI sil — kiracının tüm verisi geri dönüşsüz silinir" onclick="kiraciSil('${k.id}','${esc(k.unvan)}')"><i class="fa-solid fa-trash"></i> Sil</button>`
+          : '';
         tr.innerHTML = `
           <td><strong>${esc(k.unvan)}</strong><br><span class="eposta">${k.id}</span></td>
           <td><span class="badge ${tipB}">${esc(k.tip_ad)}</span></td>
@@ -179,6 +184,7 @@
           <td><div class="aksiyon">
             ${toggle}
             <button class="btn btn-sm btn-ghost" onclick="parola('${k.id}','${esc(k.unvan)}')"><i class="fa-solid fa-key"></i> Parola</button>
+            ${sil}
           </div></td>`;
         tb.appendChild(tr);
       });
@@ -245,6 +251,20 @@
         headers:{'Content-Type':'application/json'}, body: JSON.stringify({id, parola: yeni.trim()}) });
       const d = await r.json();
       if (d.ok) durumYaz('liste-durum', 'Parola güncellendi.', true);
+      else durumYaz('liste-durum', d.hata || 'Hata.', false);
+    }
+
+    async function kiraciSil(id, unvan) {
+      const yazilan = prompt(
+        `KALICI SİLME — geri dönüşü YOKTUR.\n\n"${unvan}" kiracısının TÜM verisi silinecek:\n` +
+        `müşteriler, dönem kapanışları, yüklenen dosyalar, mutabakat ve kanıt kayıtları.\n` +
+        `Defter kayıtları yasal saklamaya tabidir (VUK 5 / TTK 10 yıl) — emin değilseniz Pasif'te bırakın.\n\n` +
+        `Onaylamak için kiracı ünvanını AYNEN yazın:`);
+      if (yazilan === null) return;
+      const r = await fetch('/api/kiraci_sil', { method:'POST',
+        headers:{'Content-Type':'application/json'}, body: JSON.stringify({id, onay_unvan: yazilan}) });
+      const d = await r.json();
+      if (d.ok) { durumYaz('liste-durum', `"${d.unvan}" kalıcı olarak silindi.`, true); yukle(); }
       else durumYaz('liste-durum', d.hata || 'Hata.', false);
     }
 

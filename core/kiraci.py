@@ -126,6 +126,31 @@ def kiraci_parola_guncelle(kiraci_id, yeni_parola):
     return None
 
 
+def kiraci_sil(kiraci_id):
+    """Kiraciyi KALICI siler: kayit + veri/kiracilar/<id>/ altindaki TUM veri
+    (musteriler, donemler, yuklenen dosyalar, mutabakat kayitlari).
+
+    Korumalar:
+      * 'varsayilan' silinemez (uygulama acilisinda yeniden seed edilir).
+      * AKTIF kiraci silinemez — once Pasif yapilmali (pasif = arsiv;
+        yanlislikla tek tikla silmeye karsi iki asamali akis).
+    Cagiran taraf ayrica unvan-yazarak-onay almalidir (bkz. app.api_kiraci_sil)."""
+    if kiraci_id == "varsayilan":
+        return {"hata": "Varsayılan kiracı silinemez (açılışta yeniden oluşturulur)."}
+    k = kiraci_getir(kiraci_id)
+    if not k:
+        return {"hata": "Kiracı bulunamadı."}
+    if k.get("aktif", True):
+        return {"hata": "Aktif kiracı silinemez — önce Pasif yapın (arşiv), sonra silin."}
+    kalan = [x for x in kiracilari_getir() if x["id"] != kiraci_id]
+    depo._yaz(KIRACILAR_JSON, kalan)
+    kok = os.path.join(depo.ROOT_VERI, "kiracilar", kiraci_id)
+    if os.path.isdir(kok):
+        import shutil
+        shutil.rmtree(kok, ignore_errors=True)
+    return {"ok": True, "silinen": kiraci_id, "unvan": k.get("unvan", "")}
+
+
 def dogrula(eposta, parola):
     """Giris: eposta+parola dogruysa kiraci kaydini, degilse None doner."""
     k = kiraci_getir_eposta(eposta)

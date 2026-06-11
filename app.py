@@ -618,6 +618,24 @@ def api_kiraci_parola(body):
     return {"ok": True}
 
 
+def api_kiraci_sil(body):
+    """Kiraciyi KALICI siler (platform sahibi). Cifte koruma: kiraci PASIF
+    olmali (kiraci.kiraci_sil iceride dogrular) + unvan AYNEN yazilmali.
+    Silinen kiracinin acik oturumlari da dusurulur."""
+    k = kiraci.kiraci_getir(body.get("id"))
+    if not k:
+        return {"hata": "Kiracı bulunamadı."}
+    beklenen = (k.get("unvan") or "").strip()
+    yazilan = (body.get("onay_unvan") or "").strip()
+    if not beklenen or yazilan != beklenen:
+        return {"hata": "Onay için kiracı ünvanını aynen yazmalısınız."}
+    r = kiraci.kiraci_sil(k["id"])
+    if r.get("ok"):
+        for t in [t for t, o in list(_OTURUMLAR.items()) if o.get("kid") == k["id"]]:
+            _OTURUMLAR.pop(t, None)
+    return r
+
+
 # --------------------------------------------------------------------------- #
 # Kurulum (onboarding) - yeni kiracinin ilk girisinde calisir.
 # Desteklenen ERP'ler, baglanti alan semasi ve baglanti testi core/erp_konektor
@@ -1449,6 +1467,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self._gonder(api_kiraci_parola(body))
                 if p == "/api/kiraci_moduller":
                     return self._gonder(api_kiraci_moduller(body))
+                if p == "/api/kiraci_sil":
+                    return self._gonder(api_kiraci_sil(body))
             except Exception as e:
                 _hata_logla(f"POST {p}", e)
                 return self._gonder({"hata": str(e)}, code=500)
