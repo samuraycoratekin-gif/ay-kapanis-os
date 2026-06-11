@@ -32,8 +32,9 @@ from core import moduller as M
 from moduller.mutabakat import app_logic as mutabakat   # gomulu Akilli Mutabakat modulu
 
 M.yukle_hepsi()                      # moduller/ icindeki tum modulleri kaydet
-AKTIF_DONEM = "2026-05"              # varsayilan donem
-DONEMLER = ["2026-05", "2026-04", "2026-03", "2026-02", "2026-01"]  # secilebilir donemler
+AKTIF_DONEM = "2026-05"              # varsayilan donem (Haziran'da Mayis kapanisi yapilir)
+DONEMLER = ["2026-06", "2026-05", "2026-04", "2026-03",
+            "2026-02", "2026-01"]    # secilebilir donemler
 
 TPL = os.path.join(HERE, "templates")
 STATIC = os.path.join(HERE, "static")
