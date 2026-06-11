@@ -42,6 +42,7 @@ düşer: ofis adı + ilk yönetici + kullandığı muhasebe programı (ERP).
 | `PLATFORM_PAROLA` | **Evet (bulutta)** | Platform sahibi parolası. Varsayılan yalnızca yereldedir; canlıda mutlaka değiştirin. |
 | `GIRIS_PAROLASI` | Önerilir | İlk varsayılan kiracının seed parolası. |
 | `VARSAYILAN_EPOSTA` | Hayır | İlk varsayılan kiracının e-postası (varsayılan `ofis@aykapanis.local`). |
+| `KASA_ANAHTARI` | **Evet (bulutta)** | Sır şifreleme + portal token imza anahtarı. Ayarlanmazsa `PLATFORM_PAROLA`'ya düşer; anahtar **değişirse** maille gitmiş tüm mutabakat portal linkleri geçersizleşir ve kayıtlı ERP sırları çözülemez. Bir kez üret, sabitle, bir daha değiştirme. |
 
 > **Güvenlik:** Parolalar pbkdf2-sha256 ile hash'lenir; düz parola hiçbir yerde
 > saklanmaz. Gerçek müşteri verisi (`veri/`) `.gitignore` ile repodan dışlanır.
@@ -52,11 +53,22 @@ düşer: ofis adı + ilk yönetici + kullandığı muhasebe programı (ERP).
 2. Railway'de **New Project → Deploy from GitHub repo** ile bu repoyu seçin.
    `Procfile` (`web: python app.py`) ve `requirements.txt` otomatik algılanır.
 3. **Variables** sekmesinden yukarıdaki env değişkenlerini girin
-   (`PLATFORM_PAROLA`, `GIRIS_PAROLASI`, `VERI_DIR=/data`).
+   (`PLATFORM_PAROLA`, `GIRIS_PAROLASI`, `VERI_DIR=/data`, `KASA_ANAHTARI`).
 4. **Volume** ekleyin ve mount yolunu `VERI_DIR` ile aynı yapın (`/data`).
 5. Deploy sonrası verilen URL'de `/giris` ile açılır.
+
+### Canlıya alma kontrol listesi
+
+- [ ] `KASA_ANAHTARI` Railway Variables'a **sabit** girildi ve Apply yapıldı
+      (mutabakat portal linki göndermeye başlamadan ÖNCE — sonradan değişirse
+      gönderilmiş tüm linkler ölür, ERP sırları çözülemez).
+- [ ] `VERI_DIR=/data` + Volume mount aynı yol.
+- [ ] `PLATFORM_PAROLA` canlıda varsayılandan farklı.
 
 ## Bağımlılıklar
 
 `openpyxl`, `xlrd` (Excel okuma). Geri kalan her şey Python standart kütüphanesi.
-Akıllı Mutabakat (Mutabakat_AI) entegrasyonu opsiyoneldir; yoksa devre dışı kalır.
+
+Akıllı Mutabakat artık gömülü modüldür (`moduller/mutabakat/`); kiracıda
+`mutabakat` modül bayrağı açıksa çalışır. Bağımsız `Projeler/Mutabakat_AI/`
+klasörü yalnızca satış demosudur (bkz. oradaki README).

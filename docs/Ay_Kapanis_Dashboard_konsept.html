@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Otonom Ay Kapanış Kokpiti — Denetim ve Otomasyon Sistemi</title>
+  
+  <!-- Google Fonts: Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --bg-card: rgba(15, 23, 42, 0.65);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #06b6d4;
+      --accent-cyan-glow: rgba(6, 182, 212, 0.35);
+      --accent-gold: #fbbf24;
+      --accent-emerald: #10b981;
+      --accent-purple: #a78bfa;
+      --accent-rose: #f43f5e;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --glass-bg: rgba(15, 23, 42, 0.4);
+      --glass-border: rgba(255, 255, 255, 0.05);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(6, 182, 212, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(167, 139, 250, 0.1) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.06) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 30px 20px;
+      line-height: 1.5;
+    }
+
+    /* Container layout */
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Top Glass Header */
+    header {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 24px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+
+    .logo-area h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #ffffff 30%, var(--accent-cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-area p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .header-meta {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .status-badge {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: var(--accent-emerald);
+      padding: 6px 14px;
+      border-radius: 50px;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-badge .pulse {
+      width: 8px;
+      height: 8px;
+      background: var(--accent-emerald);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--accent-emerald);
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.9); opacity: 0.6; }
+      50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 12px var(--accent-emerald); }
+      100% { transform: scale(0.9); opacity: 0.6; }
+    }
+
+    /* Main Dashboard Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Navigation Sidebar */
+    .sidebar {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      height: fit-content;
+      position: sticky;
+      top: 30px;
+    }
+
+    .nav-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 6px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      color: var(--text-muted);
+      font-family: 'Outfit', sans-serif;
+      font-size: 14.5px;
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .nav-item:hover {
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text-main);
+      transform: translateX(4px);
+    }
+
+    .nav-item.active {
+      background: rgba(6, 182, 212, 0.08);
+      border-color: rgba(6, 182, 212, 0.15);
+      color: var(--accent-cyan);
+      box-shadow: 0 4px 20px -5px rgba(6, 182, 212, 0.25);
+    }
+
+    .nav-item-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-item i {
+      font-size: 15px;
+      width: 18px;
+      text-align: center;
+    }
+
+    .nav-progress {
+      font-size: 11px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 2px 8px;
+      border-radius: 20px;
+      color: var(--text-muted);
+    }
+
+    .nav-item.active .nav-progress {
+      background: rgba(6, 182, 212, 0.2);
+      color: var(--accent-cyan);
+      font-weight: 700;
+    }
+
+    /* Content Area */
+    .content-container {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Top Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+    }
+
+    @media (max-width: 768px) {
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: var(--accent-cyan);
+      opacity: 0.4;
+    }
+
+    .stat-card.gold::after { background: var(--accent-gold); }
+    .stat-card.rose::after { background: var(--accent-rose); }
+    .stat-card.emerald::after { background: var(--accent-emerald); }
+
+    .stat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-header i {
+      font-size: 16px;
+    }
+
+    .stat-val {
+      font-family: 'Outfit', sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-top: 4px;
+    }
+
+    .stat-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stat-desc span.green { color: var(--accent-emerald); font-weight: 700; }
+    .stat-desc span.rose { color: var(--accent-rose); font-weight: 700; }
+
+    /* Glass Panels */
+    .panel {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 30px;
+      display: none;
+      animation: tabFadeIn 0.4s ease forwards;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    @keyframes tabFadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 20px;
+    }
+
+    .panel-title h2 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .panel-title p {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .panel-header-icon {
+      font-size: 20px;
+      color: var(--accent-cyan);
+      background: rgba(6, 182, 212, 0.08);
+      border: 1px solid rgba(6, 182, 212, 0.15);
+      padding: 10px;
+      border-radius: 12px;
+    }
+
+    /* Grid boxes */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .feature-box {
+      background: rgba(255, 255, 255, 0.015);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      border-radius: 16px;
+      padding: 20px;
+      transition: all 0.3s ease;
+    }
+
+    .feature-box:hover {
+      background: rgba(255, 255, 255, 0.03);
+      border-color: rgba(255, 255, 255, 0.06);
+      transform: translateY(-2px);
+    }
+
+    .feature-box h3 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .feature-box p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Interactive Simulator Box */
+    .simulator {
+      background: rgba(7, 10, 19, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 16px;
+      padding: 24px;
+      margin-top: 20px;
+    }
+
+    .simulator-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .table-container {
+      overflow-x: auto;
+      margin-bottom: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+      text-align: left;
+    }
+
+    th {
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text-muted);
+      font-weight: 600;
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      color: var(--text-main);
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.01);
+    }
+
+    .badge-sim {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .badge-sim.err {
+      background: rgba(244, 63, 94, 0.1);
+      color: var(--accent-rose);
+      border: 1px solid rgba(244, 63, 94, 0.15);
+    }
+
+    .badge-sim.warn {
+      background: rgba(251, 191, 36, 0.1);
+      color: var(--accent-gold);
+      border: 1px solid rgba(251, 191, 36, 0.15);
+    }
+
+    .badge-sim.success {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--accent-emerald);
+      border: 1px solid rgba(16, 185, 129, 0.15);
+    }
+
+    /* Terminal Console Mockup */
+    .console-box {
+      background: #04060b;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 18px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12.5px;
+      color: #38bdf8;
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 16px;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);
+    }
+
+    .console-line {
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+
+    .console-line.success { color: #4ade80; }
+    .console-line.warn { color: #facc15; }
+    .console-line.error { color: #f87171; }
+    .console-line.neutral { color: #94a3b8; }
+
+    /* Action buttons */
+    .btn-panel {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 13.5px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 15px rgba(6, 182, 212, 0.25);
+      transition: all 0.3s;
+    }
+
+    .btn-panel:hover {
+      box-shadow: 0 4px 22px rgba(6, 182, 212, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      padding: 11px 20px;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: 13.5px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .button-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    /* Progress bar */
+    .progress-bar-container {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.04);
+      height: 6px;
+      border-radius: 10px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-emerald));
+      height: 100%;
+      border-radius: 10px;
+      width: 72%;
+      transition: width 0.8s ease;
+    }
+
+    /* ROI Grid in Cockpit */
+    .roi-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 768px) {
+      .roi-section {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .slider-box {
+      margin-bottom: 20px;
+    }
+
+    .slider-title-flex {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .slider-val-badge {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      background: rgba(6, 182, 212, 0.1);
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+
+    .slider-element {
+      width: 100%;
+      -webkit-appearance: none;
+      height: 6px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.05);
+      outline: none;
+    }
+
+    .slider-element::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+      cursor: pointer;
+      box-shadow: 0 0 8px var(--accent-cyan);
+    }
+
+    .roi-display {
+      background: rgba(6, 182, 212, 0.02);
+      border: 1px solid rgba(6, 182, 212, 0.1);
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .roi-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    .roi-val {
+      font-family: 'Outfit', sans-serif;
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--accent-emerald);
+      text-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+    }
+
+    .roi-sub-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .roi-sub-box {
+      background: rgba(255, 255, 255, 0.01);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .roi-sub-label {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .roi-sub-val {
+      font-family: 'Outfit', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      margin-top: 2px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 24px 0 10px 0;
+      color: var(--text-muted);
+      font-size: 12.5px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      margin-top: 20px;
+    }
+
+    /* Notification message animation */
+    .notif-pill {
+      background: rgba(6, 182, 212, 0.08);
+      border: 1px solid rgba(6, 182, 212, 0.15);
+      color: var(--accent-cyan);
+      font-size: 12px;
+      padding: 8px 16px;
+      border-radius: 30px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .circle-icon-badge {
+      width: 6px;
+      height: 6px;
+      background: var(--accent-cyan);
+      border-radius: 50%;
+    }
+
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- Header -->
+    <header>
+      <div class="logo-area">
+        <h1><i class="fa-solid fa-compass-drafting"></i> Month-End Close OS</h1>
+        <p>Otonom Ay Kapanış ve Denetim Kontrol Kokpiti</p>
+      </div>
+      <div class="header-meta">
+        <div class="notif-pill">
+          <div class="circle-icon-badge"></div>
+          <span>ERP Bağlantısı: Logo Tiger API</span>
+        </div>
+        <div class="status-badge">
+          <div class="pulse"></div>
+          <span>Aktif Kapanış Dönemi: Mayıs 2026</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Dashboard Grid -->
+    <div class="dashboard-grid">
+      
+      <!-- Sidebar Navigation -->
+      <aside class="sidebar">
+        <div class="nav-title">KAPANIS KONTROLÜ</div>
+        
+        <button class="nav-item active" onclick="switchPanel('genel-bakis')">
+          <span class="nav-item-left">
+            <i class="fa-solid fa-gauge-high"></i>
+            <span>Genel Bakış</span>
+          </span>
+          <span class="nav-progress">72%</span>
+        </button>
+
+        <button class="nav-item" onclick="switchPanel('kdv-kontrol')">
+          <span class="nav-item-left">
+            <i class="fa-solid fa-building-columns"></i>
+            <span>e-Fatura &amp; KDV Kontrolü</span>
+          </span>
+          <span class="nav-progress" id="kdv-nav-pct">60%</span>
+        </button>
+
+        <button class="nav-item" onclick="switchPanel('cari-mutabakat')">
+          <span class="nav-item-left">
+            <i class="fa-solid fa-handshake"></i>
+            <span>Cari Mutabakat Motoru</span>
+          </span>
+          <span class="nav-progress" id="cari-nav-pct">80%</span>
+        </button>
+
+        <button class="nav-item" onclick="switchPanel('banka-esleme')">
+          <span class="nav-item-left">
+            <i class="fa-solid fa-money-bill-transfer"></i>
+            <span>Banka Ekstre Eşleme</span>
+          </span>
+          <span class="nav-progress" id="banka-nav-pct">50%</span>
+        </button>
+
+        <button class="nav-item" onclick="switchPanel('kur-farki')">
+          <span class="nav-item-left">
+            <i class="fa-solid fa-coins"></i>
+            <span>Kur Farkı &amp; Reeskont</span>
+          </span>
+          <span class="nav-progress" id="kur-nav-pct">100%</span>
+        </button>
+
+        <button class="nav-item" onclick="switchPanel('roi-calc')">
+          <span class="nav-item-left">
+            <i class="fa-solid fa-calculator"></i>
+            <span>Kazanç / ROI Analizi</span>
+          </span>
+          <span class="nav-progress">₺</span>
+        </button>
+      </aside>
+
+      <!-- Content Container -->
+      <main class="content-container">
+        
+        <!-- Stats Row -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-header">
+              <span>Toplam Cari Hesap</span>
+              <i class="fa-solid fa-users" style="color: var(--accent-cyan)"></i>
+            </div>
+            <div class="stat-val">342</div>
+            <div class="stat-desc">
+              <span class="green">312 Mutabık</span> &nbsp;|&nbsp; 30 Açık Cari
+            </div>
+          </div>
+
+          <div class="stat-card gold">
+            <div class="stat-header">
+              <span>GİB Fatura Uyuşmazlığı</span>
+              <i class="fa-solid fa-triangle-exclamation" style="color: var(--accent-gold)"></i>
+            </div>
+            <div class="stat-val" id="gib-stats-count">8 Fatura</div>
+            <div class="stat-desc">
+              <span class="rose">₺42,150 KDV Riski</span>
+            </div>
+          </div>
+
+          <div class="stat-card rose">
+            <div class="stat-header">
+              <span>Eşleşmeyen Banka Hareketi</span>
+              <i class="fa-solid fa-landmark" style="color: var(--accent-rose)"></i>
+            </div>
+            <div class="stat-val" id="bank-stats-count">14 İşlem</div>
+            <div class="stat-desc">
+              <span>₺118,500 Havale Kaydı Yok</span>
+            </div>
+          </div>
+
+          <div class="stat-card emerald">
+            <div class="stat-header">
+              <span>Kazanılan Süre</span>
+              <i class="fa-solid fa-clock" style="color: var(--accent-emerald)"></i>
+            </div>
+            <div class="stat-val">42 Saat</div>
+            <div class="stat-desc">
+              <span class="green">%84 Hız Artışı</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL 1: Genel Bakış -->
+        <section id="genel-bakis" class="panel active">
+          <div class="panel-header">
+            <div class="panel-title">
+              <h2><i class="fa-solid fa-gauge-high"></i> Dönem Kapanış Genel Durumu</h2>
+              <p>Mayıs 2026 dönemi finansal kontrolleri ve otomatik onay durumları.</p>
+            </div>
+            <div class="panel-header-icon"><i class="fa-solid fa-gauge-high"></i></div>
+          </div>
+
+          <p style="margin-bottom: 20px;">Sistemimiz ERP (Logo Tiger) kayıtlarını arka planda taramış, GİB e-Fatura kayıtları ve banka MT940 ekstreleri ile çapraz kontrolleri başlatmıştır. Şu anki Kapanış İlerleme Durumu: <strong>%72</strong>.</p>
+          
+          <div style="margin-bottom: 30px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight:600; margin-bottom: 6px;">
+              <span>Genel Kontrol Listesi Başarısı</span>
+              <span style="color: var(--accent-cyan);">72%</span>
+            </div>
+            <div class="progress-bar-container">
+              <div class="progress-bar" id="general-progress-bar" style="width: 72%;"></div>
+            </div>
+          </div>
+
+          <div class="feature-grid">
+            <div class="feature-box">
+              <h3><i class="fa-solid fa-shield-halved" style="color: var(--accent-emerald)"></i> Tam Beyanname Güvenliği</h3>
+              <p>Deftere işlenmemiş alış faturaları ve iptal edilmiş satış faturaları otomatik süzüldüğü için KDV beyannamesi sıfır hata riskiyle hazırlanır.</p>
+            </div>
+            <div class="feature-box">
+              <h3><i class="fa-solid fa-bolt" style="color: var(--accent-cyan)"></i> Otonom Eşleştirme Hızı</h3>
+              <p>Milyonlarca liralık banka hareketleri ve cari belgeler yapay zekâlı `subset-sum` motoru ile saniyeler içinde eşleşir.</p>
+            </div>
+            <div class="feature-box">
+              <h3><i class="fa-solid fa-hourglass" style="color: var(--accent-gold)"></i> Takipsizliği Önleme</h3>
+              <p>Kapanışı engelleyen eksik faturalar, onay bekleyen farklar ve itirazlı mutabakatlar ilgili departmana otomatik görev olarak atanır.</p>
+            </div>
+          </div>
+
+          <div style="margin-top: 10px;">
+            <h3 style="font-family: 'Outfit', sans-serif; font-size: 16px; margin-bottom: 12px;"><i class="fa-solid fa-list-check" style="color: var(--accent-purple)"></i> Kapanış Kontrol Listesi Adımları</h3>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); border-radius: 12px; padding: 12px 16px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:13.5px;"><i class="fa-solid fa-circle-check" style="color: var(--accent-emerald); margin-right:8px;"></i> TCMB Kur Değerlemesi &amp; Kur Farkı Kayıtları</span>
+                <span class="badge-sim success">Tamamlandı</span>
+              </div>
+              <div style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); border-radius: 12px; padding: 12px 16px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:13.5px;"><i class="fa-solid fa-spinner" style="color: var(--accent-gold); margin-right:8px; animation: spin 2s linear infinite;"></i> Cari Hesap Mutabakat Formlarının Gönderimi &amp; Takibi</span>
+                <span class="badge-sim warn">%80 Yanıtlandı</span>
+              </div>
+              <div style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); border-radius: 12px; padding: 12px 16px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:13.5px;"><i class="fa-solid fa-triangle-exclamation" style="color: var(--accent-rose); margin-right:8px;"></i> GİB e-Fatura &amp; ERP Fatura Kayıt Karşılaştırması</span>
+                <span class="badge-sim err">8 Hata Bulundu</span>
+              </div>
+              <div style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); border-radius: 12px; padding: 12px 16px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:13.5px;"><i class="fa-solid fa-circle-exclamation" style="color: var(--accent-rose); margin-right:8px;"></i> Banka Ekstrelerindeki Açık Kayıtların Eşleştirilmesi</span>
+                <span class="badge-sim err">14 Uyuşmazlık</span>
+              </div>
+            </div>
+          </div>
+          
+          <style>
+            @keyframes spin { 100% { transform: rotate(360deg); } }
+          </style>
+        </section>
+
+        <!-- PANEL 2: GİB & KDV Kontrolü -->
+        <section id="kdv-kontrol" class="panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <h2><i class="fa-solid fa-building-columns"></i> GİB Hakemliğinde e-Fatura &amp; KDV Uyumu</h2>
+              <p>GİB kayıtları ile ERP kayıtlarının karşılaştırılarak vergi/KDV risklerinin önlenmesi.</p>
+            </div>
+            <div class="panel-header-icon"><i class="fa-solid fa-building-columns"></i></div>
+          </div>
+
+          <p style="margin-bottom: 20px;">GİB e-Fatura portalından çekilen Mayıs 2026 fatura veritabanı ile Logo Tiger alış/satış faturaları matris eşleşmesinden geçen uyuşmazlıklar aşağıda listelenmiştir. Bu faturaların beyanname öncesi düzeltilmesi şarttır.</p>
+
+          <!-- Simulator Box -->
+          <div class="simulator">
+            <div class="simulator-title">
+              <i class="fa-solid fa-arrows-spin" style="color: var(--accent-cyan)"></i> İnteraktif GİB Doğrulama Simülatörü
+            </div>
+            
+            <div class="table-container">
+              <table id="kdv-table">
+                <thead>
+                  <tr>
+                    <th>Fatura No</th>
+                    <th>Cari Ünvanı</th>
+                    <th>GİB Tarih</th>
+                    <th>GİB Tutar</th>
+                    <th>ERP Tutar</th>
+                    <th>Hata Durumu / Analiz</th>
+                    <th>İşlem</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr id="kdv-row-1">
+                    <td>GIB202600122</td>
+                    <td>Borusan Lojistik A.Ş.</td>
+                    <td>18.05.2026</td>
+                    <td>₺12,500.00</td>
+                    <td style="color: var(--accent-rose)">Bulunamadı</td>
+                    <td><span class="badge-sim err">Fatura ERP'de Yok</span></td>
+                    <td><button class="btn-secondary" style="padding: 6px 12px; font-size:11.5px;" onclick="kdvFix('1', 'Borusan', 12500)">ERP'ye İşle</button></td>
+                  </tr>
+                  <tr id="kdv-row-2">
+                    <td>GIB202600854</td>
+                    <td>Petrol Ofisi A.Ş.</td>
+                    <td>20.05.2026</td>
+                    <td>₺8,400.00</td>
+                    <td style="color: var(--accent-rose)">₺840.00</td>
+                    <td><span class="badge-sim err">Hatalı Tutar (Kuruş/Sıfır Eksik)</span></td>
+                    <td><button class="btn-secondary" style="padding: 6px 12px; font-size:11.5px;" onclick="kdvFix('2', 'Petrol Ofisi', 8400)">Tutarı Düzelt</button></td>
+                  </tr>
+                  <tr id="kdv-row-3">
+                    <td>GIB202600991</td>
+                    <td>Türk Telekom A.Ş.</td>
+                    <td>14.05.2026</td>
+                    <td style="color: var(--accent-rose)">İptal Edilmiş</td>
+                    <td>₺4,250.00</td>
+                    <td><span class="badge-sim err">İptal Edilen Fatura Aktif</span></td>
+                    <td><button class="btn-secondary" style="padding: 6px 12px; font-size:11.5px;" onclick="kdvFix('3', 'Türk Telekom', 4250)">ERP'den Çıkar</button></td>
+                  </tr>
+                  <tr id="kdv-row-4">
+                    <td>GIB202601245</td>
+                    <td>Trendyol Express Lojistik</td>
+                    <td>22.05.2026</td>
+                    <td>₺17,000.00</td>
+                    <td style="color: var(--accent-rose)">Bulunamadı</td>
+                    <td><span class="badge-sim err">Fatura ERP'de Yok</span></td>
+                    <td><button class="btn-secondary" style="padding: 6px 12px; font-size:11.5px;" onclick="kdvFix('4', 'Trendyol', 17000)">ERP'ye İşle</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="button-group">
+              <button class="btn-panel" id="kdv-simulate-btn" onclick="startKDVSimulation()">
+                <i class="fa-solid fa-play"></i> GİB Karşılaştırmasını Çalıştır
+              </button>
+              <button class="btn-secondary" onclick="resetKDVSimulation()">
+                Sıfırla
+              </button>
+            </div>
+
+            <!-- Terminal Output -->
+            <div class="console-box" id="kdv-console">
+              <div class="console-line neutral">[Sistem] e-Fatura &amp; KDV Uyumu Modülü Başlatılmaya Hazır.</div>
+              <div class="console-line neutral">[Bilgi] API Entegratörü: Logo Tiger DB + GİB portal.</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PANEL 3: Cari Mutabakat Motoru -->
+        <section id="cari-mutabakat" class="panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <h2><i class="fa-solid fa-handshake"></i> Akıllı Cari Mutabakat Motoru</h2>
+              <p>Çift yönlü cari ekstre karşılaştırma, parçalı ödeme analizi ve onay takibi.</p>
+            </div>
+            <div class="panel-header-icon"><i class="fa-solid fa-handshake"></i></div>
+          </div>
+
+          <p style="margin-bottom: 20px;">Sistemimiz Mayıs 2026 döneminde 342 carinin 312'sini tam mutabakatla otomatik kapatmıştır. Kalan itirazlı veya uyuşmazlı cariler için parçalı ödeme kombinasyon motoru (`subset-sum`) sonuçları aşağıdadır.</p>
+
+          <!-- Simulator Box -->
+          <div class="simulator">
+            <div class="simulator-title">
+              <i class="fa-solid fa-gears" style="color: var(--accent-cyan)"></i> Cari Fark &amp; Parçalı Ödeme Analiz Simülatörü
+            </div>
+            
+            <div class="table-container">
+              <table id="cari-table">
+                <thead>
+                  <tr>
+                    <th>Cari Kod</th>
+                    <th>Cari Adı</th>
+                    <th>Bizim Bakiye</th>
+                    <th>Karşı Bakiye</th>
+                    <th>Fark Tutarı</th>
+                    <th>Motor Tespiti &amp; Çözüm</th>
+                    <th>Durum / İşlem</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr id="cari-row-1">
+                    <td>C-00214</td>
+                    <td>Netda Bilgi Teknolojileri</td>
+                    <td>₺150,000.00</td>
+                    <td>₺100,000.00</td>
+                    <td style="color: var(--accent-rose)">₺50,000.00</td>
+                    <td><span class="badge-sim warn" id="cari-det-1">Analiz edilmedi</span></td>
+                    <td><button class="btn-secondary" style="padding: 6px 12px; font-size:11.5px;" id="cari-btn-1" onclick="cariSolve('1', 'Netda', 150000, 100000)">Fark Analiz Et</button></td>
+                  </tr>
+                  <tr id="cari-row-2">
+                    <td>C-00388</td>
+                    <td>Demir Çelik Sanayi A.Ş.</td>
+                    <td>₺90,000.00</td>
+                    <td>₺90,000.00</td>
+                    <td>₺0.00</td>
+                    <td><span class="badge-sim success">Evrak Format Farkı Çözüldü</span></td>
+                    <td><button class="btn-panel" style="padding: 6px 12px; font-size:11.5px; background:var(--accent-emerald);" disabled><i class="fa-solid fa-lock"></i> Kilitli</button></td>
+                  </tr>
+                  <tr id="cari-row-3">
+                    <td>C-00412</td>
+                    <td>Hedef Sağlık Ürünleri</td>
+                    <td>₺75,000.00</td>
+                    <td>₺40,000.00</td>
+                    <td style="color: var(--accent-rose)">₺35,000.00</td>
+                    <td><span class="badge-sim warn" id="cari-det-3">Analiz edilmedi</span></td>
+                    <td><button class="btn-secondary" style="padding: 6px 12px; font-size:11.5px;" id="cari-btn-3" onclick="cariSolve('3', 'Hedef Sağlık', 75000, 40000)">Fark Analiz Et</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="console-box" id="cari-console">
+              <div class="console-line neutral">[Sistem] Parçalı Ödeme ve Kombinasyon Eşleştirme Motoru hazır.</div>
+              <div class="console-line neutral">[Motor] Kombinasyon derinliği limiti: 4 fatura. Tolerans: 0.01 TL.</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PANEL 4: Banka Ekstre Eşleme -->
+        <section id="banka-esleme" class="panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <h2><i class="fa-solid fa-money-bill-transfer"></i> Otonom Banka Ekstre Eşleme (Bank Matcher)</h2>
+              <p>Banka MT940 ekstre kayıtlarını, tutar ve açıklama analizi ile ERP banka fişleriyle eşleştirme.</p>
+            </div>
+            <div class="panel-header-icon"><i class="fa-solid fa-money-bill-transfer"></i></div>
+          </div>
+
+          <p style="margin-bottom: 20px;">Mayıs ayında banka hesaplarımıza gelen 1,240 adet para transferinin 1,226'sı otomatik eşleştirilmiştir. Aşağıda, muhasebe kaydı bulunmayan ancak banka ekstresinde yer alan 14 adet uyuşmazlık ve anomali listelenmektedir.</p>
+
+          <!-- Simulator Box -->
+          <div class="simulator">
+            <div class="simulator-title">
+              <i class="fa-solid fa-terminal" style="color: var(--accent-cyan)"></i> Banka Eşleme &amp; Muhasebeleştirme Simülatörü
+            </div>
+
+            <div class="table-container">
+              <table id="banka-table">
+                <thead>
+                  <tr>
+                    <th>İşlem Tarihi</th>
+                    <th>Banka / Şube</th>
+                    <th>İşlem Açıklaması</th>
+                    <th>Tutar</th>
+                    <th>Bulgu Türü</th>
+                    <th>Çözüm Önerisi</th>
+                    <th>İşlem</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr id="banka-row-1">
+                    <td>28.05.2026</td>
+                    <td>Garanti BBVA</td>
+                    <td>Özdemir Yapı Dekont 45290 - Hırdavat</td>
+                    <td style="color: var(--accent-emerald); font-weight:700;">+₺45,000.00</td>
+                    <td><span class="badge-sim warn">Cari Kaydı Yok</span></td>
+                    <td>Gelen Havale Fişi oluşturulacak.</td>
+                    <td><button class="btn-secondary" style="padding: 6px 12px; font-size:11.5px;" onclick="bankaSolve('1', 'Özdemir Yapı', 45000)">Fiş Oluştur</button></td>
+                  </tr>
+                  <tr id="banka-row-2">
+                    <td>31.05.2026</td>
+                    <td>Akbank Merkez</td>
+                    <td>AKBANK MAYIS DÖNEMİ POS KOMİSYON KESİNTİSİ</td>
+                    <td style="color: var(--accent-rose); font-weight:700;">-₺3,500.00</td>
+                    <td><span class="badge-sim warn">Gider Fişi Yok</span></td>
+                    <td>780 Banka Giderleri hesabına fiş kesilecek.</td>
+                    <td><button class="btn-secondary" style="padding: 6px 12px; font-size:11.5px;" onclick="bankaSolve('2', 'Akbank Komisyon', 3500)">Gider Fişi Kes</button></td>
+                  </tr>
+                  <tr id="banka-row-3">
+                    <td>30.05.2026</td>
+                    <td>QNB Finansbank</td>
+                    <td>Bireysel kredi kartı ödemesi (Cem Şahin)</td>
+                    <td style="color: var(--accent-emerald); font-weight:700;">+₺70,000.00</td>
+                    <td><span class="badge-sim warn">Ortağı Borçlandırma</span></td>
+                    <td>131 Ortaklardan Alacaklar hesabına virman.</td>
+                    <td><button class="btn-secondary" style="padding: 6px 12px; font-size:11.5px;" onclick="bankaSolve('3', 'Cem Şahin Kredi', 70000)">Virman Kaydı At</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="console-box" id="banka-console">
+              <div class="console-line neutral">[Sistem] Garanti BBVA, Akbank ve QNB Finansbank Mayıs ekstreleri yüklendi.</div>
+              <div class="console-line neutral">[İşlem] 1,226 kayıt ERP yevmiye maddeleriyle tam eşleşti.</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PANEL 5: Kur Farkı & Reeskont -->
+        <section id="kur-farki" class="panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <h2><i class="fa-solid fa-coins"></i> Otonom Kur Farkı &amp; Değerleme Robotu</h2>
+              <p>TCMB döviz kurlarını çekerek yabancı paralı carilerin ve banka hesaplarının otomatik değerlenmesi.</p>
+            </div>
+            <div class="panel-header-icon"><i class="fa-solid fa-coins"></i></div>
+          </div>
+
+          <p style="margin-bottom: 20px;">31 Mayıs 2026 tarihindeki TCMB Döviz Kurları (USD: 33.42 TL, EUR: 36.15 TL) baz alınarak dövizli hesapların değerlemesi yapılmıştır. Kapanış kur farkı fiş taslakları hazırlanmıştır.</p>
+
+          <div class="feature-grid">
+            <div class="feature-box" style="border-top: 3px solid var(--accent-cyan);">
+              <h3>USD Değerleme Kuru</h3>
+              <p style="font-size: 20px; font-weight:800; color:var(--accent-cyan); margin: 6px 0;">33.4200 TL</p>
+              <p>TCMB 31.05.2026 efektif satış kuru.</p>
+            </div>
+            <div class="feature-box" style="border-top: 3px solid var(--accent-purple);">
+              <h3>EUR Değerleme Kuru</h3>
+              <p style="font-size: 20px; font-weight:800; color:var(--accent-purple); margin: 6px 0;">36.1500 TL</p>
+              <p>TCMB 31.05.2026 efektif satış kuru.</p>
+            </div>
+            <div class="feature-box" style="border-top: 3px solid var(--accent-emerald);">
+              <h3>Toplam Kur Farkı Geliri</h3>
+              <p style="font-size: 20px; font-weight:800; color:var(--accent-emerald); margin: 6px 0;">+₺145,280.00</p>
+              <p>646 Kambiyo Karları hesabına atılacak tutar.</p>
+            </div>
+          </div>
+
+          <div class="simulator">
+            <div class="simulator-title">
+              <i class="fa-solid fa-list" style="color: var(--accent-cyan)"></i> ERP'ye Aktarılacak Kur Farkı Fiş Listesi
+            </div>
+            
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Hesap Kodu</th>
+                    <th>Hesap Adı</th>
+                    <th>Dövizli Bakiye</th>
+                    <th>Değerleme Öncesi (TL)</th>
+                    <th>Değerleme Sonrası (TL)</th>
+                    <th>Hesaplanan Kur Farkı</th>
+                    <th>ERP Durumu</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>120.01.0022</td>
+                    <td>Global Trading Inc. (Müşteri)</td>
+                    <td>$45,000.00</td>
+                    <td>₺1,485,000.00</td>
+                    <td>₺1,503,900.00</td>
+                    <td style="color: var(--accent-emerald); font-weight:700;">+₺18,900.00 (Kar)</td>
+                    <td><span class="badge-sim success"><i class="fa-solid fa-check"></i> ERP Taslak Hazır</span></td>
+                  </tr>
+                  <tr>
+                    <td>320.01.0450</td>
+                    <td>DHL Global Forwarding (Tedarikçi)</td>
+                    <td>&euro;12,000.00</td>
+                    <td>₺435,000.00</td>
+                    <td>₺433,800.00</td>
+                    <td style="color: var(--accent-emerald); font-weight:700;">+₺1,200.00 (Kar)</td>
+                    <td><span class="badge-sim success"><i class="fa-solid fa-check"></i> ERP Taslak Hazır</span></td>
+                  </tr>
+                  <tr>
+                    <td>102.01.0089</td>
+                    <td>Vakıfbank USD Döviz Hesabı</td>
+                    <td>$120,000.00</td>
+                    <td>₺3,960,000.00</td>
+                    <td>₺4,010,400.00</td>
+                    <td style="color: var(--accent-emerald); font-weight:700;">+₺50,400.00 (Kar)</td>
+                    <td><span class="badge-sim success"><i class="fa-solid fa-check"></i> ERP Taslak Hazır</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <button class="btn-panel" onclick="alert('Kur Farkı Taslakları Logo Tiger ERP veritabanına aktarıldı. Onay havuzundan inceleyebilirsiniz.')">
+              <i class="fa-solid fa-cloud-arrow-up"></i> Tüm Fişleri ERP'ye Gönder
+            </button>
+          </div>
+        </section>
+
+        <!-- PANEL 6: ROI Analizi -->
+        <section id="roi-calc" class="panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <h2><i class="fa-solid fa-wallet"></i> Yatırım Dönüşü (ROI) &amp; Kazanç Analizi</h2>
+              <p>Otonom Ay Kapanış Kokpiti'nin işletmenize veya muhasebe ofisinize sağlayacağı ek getiri hesabı.</p>
+            </div>
+            <div class="panel-header-icon"><i class="fa-solid fa-wallet"></i></div>
+          </div>
+
+          <div class="roi-section">
+            <div class="roi-inputs">
+              <div class="slider-box">
+                <div class="slider-title-flex">
+                  <span>Aylık Toplam Fatura / Belge Sayısı</span>
+                  <span class="slider-val-badge" id="val-invoices">2,500 Adet</span>
+                </div>
+                <input type="range" min="500" max="15000" step="500" value="2500" class="slider-element" id="slide-invoices" oninput="calculateROI()">
+              </div>
+
+              <div class="slider-box">
+                <div class="slider-title-flex">
+                  <span>Ortalama Aylık Kaybolan / Atlanan KDV Matrahı (TL)</span>
+                  <span class="slider-val-badge" id="val-kdv-loss">150,000 TL</span>
+                </div>
+                <input type="range" min="10000" max="1000000" step="10000" value="150000" class="slider-element" id="slide-kdv-loss" oninput="calculateROI()">
+              </div>
+
+              <div class="slider-box">
+                <div class="slider-title-flex">
+                  <span>Ay Kapanışı İçin Çalışan Personel Sayısı</span>
+                  <span class="slider-val-badge" id="val-staff">3 Personel</span>
+                </div>
+                <input type="range" min="1" max="15" step="1" value="3" class="slider-element" id="slide-staff" oninput="calculateROI()">
+              </div>
+
+              <div class="slider-box">
+                <div class="slider-title-flex">
+                  <span>Personel Ortalama Aylık Maliyeti (TL)</span>
+                  <span class="slider-val-badge" id="val-cost">35,000 TL</span>
+                </div>
+                <input type="range" min="20000" max="120000" step="5000" value="35000" class="slider-element" id="slide-cost" oninput="calculateROI()">
+              </div>
+            </div>
+
+            <div class="roi-display">
+              <span class="roi-title">Yıllık Toplam Finansal Kazanç &amp; Tasarruf</span>
+              <div class="roi-val" id="roi-total-val">₺612,000</div>
+              
+              <div class="roi-sub-grid">
+                <div class="roi-sub-box">
+                  <div class="roi-sub-label">Yıllık Geri Kazanılan KDV</div>
+                  <div class="roi-sub-val" id="roi-kdv-saved" style="color: var(--accent-emerald)">₺360,000</div>
+                </div>
+                <div class="roi-sub-box">
+                  <div class="roi-sub-label">Yıllık İş Gücü Tasarrufu</div>
+                  <div class="roi-sub-val" id="roi-labor-saved" style="color: var(--accent-cyan)">₺252,000</div>
+                </div>
+              </div>
+
+              <div style="font-size:12px; color:var(--text-muted); border-top: 1px solid rgba(255,255,255,0.05); padding-top:12px; line-height:1.5;">
+                <i class="fa-solid fa-circle-info" style="color: var(--accent-gold); margin-right:4px;"></i>
+                GİB ile tam entegre otonom denetim sistemi, gözden kaçan faturalardaki KDV'yi geri kazandırır ve ay sonundaki fazla mesaileri tamamen kaldırır.
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>Otonom Kapanış ve Denetim Sistemi &copy; 2026. Antigravity AI Lab tarafından hazırlanmıştır.</p>
+    </footer>
+
+  </div>
+
+  <script>
+    // Tab switching logic
+    function switchPanel(panelId) {
+      // Hide all panels
+      const panels = document.querySelectorAll('.panel');
+      panels.forEach(p => p.classList.remove('active'));
+
+      // Remove active class from nav buttons
+      const navItems = document.querySelectorAll('.nav-item');
+      navItems.forEach(item => item.classList.remove('active'));
+
+      // Show requested panel
+      const targetPanel = document.getElementById(panelId);
+      if (targetPanel) {
+        targetPanel.classList.add('active');
+      }
+
+      // Activate corresponding navigation item
+      const activeBtn = Array.from(navItems).find(btn => btn.getAttribute('onclick').includes(panelId));
+      if (activeBtn) {
+        activeBtn.classList.add('active');
+      }
+    }
+
+    // GİB simulation
+    function startKDVSimulation() {
+      const consoleEl = document.getElementById('kdv-console');
+      consoleEl.innerHTML = '';
+      
+      const logs = [
+        { text: "[Sistem] GİB Entegrasyon API başlatılıyor...", type: "neutral" },
+        { text: "[GİB] Mayıs 2026 dönemi e-Fatura listesi indirildi (1,240 adet fatura).", type: "neutral" },
+        { text: "[ERP] Logo Tiger SQL bağlantısı sağlandı. Alış/Satış faturaları çekildi.", type: "neutral" },
+        { text: "[İşlem] Karşılaştırma matrisi çalıştırılıyor...", type: "neutral" },
+        { text: "[HATA] Borusan Lojistik A.Ş. faturası (GIB202600122) ERP'de bulunamadı! KDV Riski: ₺2,500.00", type: "error" },
+        { text: "[HATA] Petrol Ofisi A.Ş. faturası (GIB202600854) tutar uyuşmazlığı! GİB: ₺8,400.00 | ERP: ₺840.00", type: "error" },
+        { text: "[HATA] Türk Telekom faturası (GIB202600991) iptal edilmiş ancak ERP'de aktif! Risk: ₺4,250.00", type: "error" },
+        { text: "[HATA] Trendyol Express faturası (GIB202601245) ERP'de bulunamadı! KDV Riski: ₺3,400.00", type: "error" },
+        { text: "[Sistem] Analiz tamamlandı. Toplam 8 hata bulundu. Çözüm taslakları hazırlandı.", type: "warn" }
+      ];
+
+      let delay = 0;
+      logs.forEach(log => {
+        setTimeout(() => {
+          const div = document.createElement('div');
+          div.className = `console-line ${log.type}`;
+          div.innerText = log.text;
+          consoleEl.appendChild(div);
+          consoleEl.scrollTop = consoleEl.scrollHeight;
+        }, delay);
+        delay += 600;
+      });
+    }
+
+    function resetKDVSimulation() {
+      const consoleEl = document.getElementById('kdv-console');
+      consoleEl.innerHTML = `
+        <div class="console-line neutral">[Sistem] e-Fatura &amp; KDV Uyumu Modülü Başlatılmaya Hazır.</div>
+        <div class="console-line neutral">[Bilgi] API Entegratörü: Logo Tiger DB + GİB portal.</div>
+      `;
+      // Restore rows if any were resolved
+      document.getElementById('kdv-row-1').style.opacity = '1';
+      document.getElementById('kdv-row-2').style.opacity = '1';
+      document.getElementById('kdv-row-3').style.opacity = '1';
+      document.getElementById('kdv-row-4').style.opacity = '1';
+      document.getElementById('gib-stats-count').innerText = "8 Fatura";
+      document.getElementById('kdv-nav-pct').innerText = "60%";
+    }
+
+    function kdvFix(rowId, cariName, amount) {
+      const row = document.getElementById(`kdv-row-${rowId}`);
+      row.style.transition = 'all 0.5s';
+      row.style.opacity = '0.35';
+      
+      const consoleEl = document.getElementById('kdv-console');
+      const div = document.createElement('div');
+      div.className = 'console-line success';
+      div.innerText = `[Çözüm] ${cariName} uyuşmazlığı giderildi. ERP veritabanı taslak fiş güncellendi. Tutar: ₺${amount.toLocaleString('tr-TR')}`;
+      consoleEl.appendChild(div);
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+
+      // Update counters
+      const currentCount = parseInt(document.getElementById('gib-stats-count').innerText);
+      if (currentCount > 0) {
+        document.getElementById('gib-stats-count').innerText = `${currentCount - 1} Fatura`;
+        
+        // Progress update
+        const progressNum = 60 + (8 - (currentCount - 1)) * 5;
+        document.getElementById('kdv-nav-pct').innerText = `${progressNum}%`;
+      }
+    }
+
+    // Cari Mutabakat Simulation
+    function cariSolve(rowId, name, biz, karsi) {
+      const detailEl = document.getElementById(`cari-det-${rowId}`);
+      const btn = document.getElementById(`cari-btn-${rowId}`);
+      
+      detailEl.className = "badge-sim success";
+      detailEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Hesaplanan...';
+      
+      const consoleEl = document.getElementById('cari-console');
+      
+      setTimeout(() => {
+        if (rowId === '1') {
+          detailEl.innerHTML = "SUBSET-SUM Eşleşmesi Bulundu";
+          const div1 = document.createElement('div');
+          div1.className = 'console-line success';
+          div1.innerText = `[Motor] Netda (C-00214) farkı çözüldü! Karsi tarafin tek ödemesi (₺100,000.00), bizdeki 2 faturanın toplamı ile eşleşti: FT042 (₺40,000) + FT045 (₺60,000).`;
+          consoleEl.appendChild(div1);
+        } else if (rowId === '3') {
+          detailEl.innerHTML = "Tedarikçi Giriş Hatası Tespit Edildi";
+          const div1 = document.createElement('div');
+          div1.className = 'console-line success';
+          div1.innerText = `[Motor] Hedef Sağlık (C-00412) farkı çözüldü! Bizdeki fatura no FT099 (₺35,000) tedarikçi defterinde bulunamadı. Tedarikçiye WhatsApp'tan otomatik bildirim gönderildi.`;
+          consoleEl.appendChild(div1);
+        }
+        
+        btn.innerHTML = '<i class="fa-solid fa-lock"></i> Kilitli';
+        btn.className = "btn-panel";
+        btn.style.background = "var(--accent-emerald)";
+        btn.disabled = true;
+        
+        // Progress updates
+        const currentPct = parseInt(document.getElementById('cari-nav-pct').innerText);
+        document.getElementById('cari-nav-pct').innerText = `${currentPct + 10}%`;
+        
+        // General progress updates
+        const generalPct = parseInt(document.getElementById('general-progress-bar').style.width);
+        document.getElementById('general-progress-bar').style.width = `${generalPct + 5}%`;
+        document.querySelector('.nav-item.active .nav-progress').innerText = `${generalPct + 5}%`;
+      }, 1200);
+    }
+
+    // Bank match simulation
+    function bankaSolve(rowId, name, amount) {
+      const row = document.getElementById(`banka-row-${rowId}`);
+      row.style.transition = 'all 0.5s';
+      row.style.opacity = '0.35';
+
+      const consoleEl = document.getElementById('banka-console');
+      const div = document.createElement('div');
+      div.className = 'console-line success';
+      div.innerText = `[Banka] ${name} için ₺${amount.toLocaleString('tr-TR')} tutarındaki taslak fiş ERP (Logo Tiger) muhasebe onay havuzuna gönderildi.`;
+      consoleEl.appendChild(div);
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+
+      // Update stats
+      const currentCount = parseInt(document.getElementById('bank-stats-count').innerText);
+      if (currentCount > 0) {
+        document.getElementById('bank-stats-count').innerText = `${currentCount - 1} İşlem`;
+        
+        const progressNum = 50 + (14 - (currentCount - 1)) * 3;
+        document.getElementById('banka-nav-pct').innerText = `${progressNum}%`;
+      }
+    }
+
+    // ROI Calculator math
+    function calculateROI() {
+      const invoices = parseInt(document.getElementById('slide-invoices').value);
+      const kdvLossMatrah = parseInt(document.getElementById('slide-kdv-loss').value);
+      const staff = parseInt(document.getElementById('slide-staff').value);
+      const cost = parseInt(document.getElementById('slide-cost').value);
+
+      // Update labels
+      document.getElementById('val-invoices').innerText = invoices.toLocaleString('tr-TR') + ' Adet';
+      document.getElementById('val-kdv-loss').innerText = kdvLossMatrah.toLocaleString('tr-TR') + ' TL';
+      document.getElementById('val-staff').innerText = staff + ' Personel';
+      document.getElementById('val-cost').innerText = cost.toLocaleString('tr-TR') + ' TL';
+
+      // Math
+      // 1. Recovered KDV (approx 20% of lost matrah is average KDV)
+      const kdvSaved = Math.round(kdvLossMatrah * 0.20 * 12);
+      
+      // 2. Labor saved (approx 60% of close workload is automated, saving 60% of closing time)
+      // closing workload is typically 25% of total finance staff capacity
+      const laborSaved = Math.round(staff * cost * 12 * 0.25 * 0.80);
+
+      const totalROI = kdvSaved + laborSaved;
+
+      // Update UI
+      document.getElementById('roi-kdv-saved').innerText = '₺' + kdvSaved.toLocaleString('tr-TR');
+      document.getElementById('roi-labor-saved').innerText = '₺' + laborSaved.toLocaleString('tr-TR');
+      document.getElementById('roi-total-val').innerText = '₺' + totalROI.toLocaleString('tr-TR');
+    }
+
+    window.onload = function() {
+      calculateROI();
+    };
+  </script>
+</body>
+</html>
