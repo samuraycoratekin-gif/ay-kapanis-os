@@ -143,6 +143,11 @@
       ).join('');
     }
 
+    // Oturum dustuyse (sunucu yeniden basladi / sure doldu) HERHANGI bir
+    // istekte giris sayfasina don — dugmeler sessizce "calismiyor" gorunmesin.
+    (() => { const _f = window.fetch;
+      window.fetch = (...a) => _f(...a).then(r => { if (r.status === 401) location.href = '/giris'; return r; }); })();
+
     async function yukle() {
       const r = await fetch('/api/kiracilar');
       if (r.status === 401) { window.location.href = '/giris'; return; }
