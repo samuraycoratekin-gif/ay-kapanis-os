@@ -52,7 +52,10 @@ BULUT = bool(os.environ.get("PORT"))
 # AZAMI (mutlak ust sinir). Gecince jeton dusurulur, yeniden giris istenir.
 OTURUM_BOSTA_SN = int(os.environ.get("OTURUM_BOSTA_SN", 2 * 3600))    # 2 saat islemsizlik
 OTURUM_AZAMI_SN = int(os.environ.get("OTURUM_AZAMI_SN", 12 * 3600))   # 12 saat mutlak
-_OTURUMLAR = {}                       # {token: {"kid":..,"baslangic":ts,"son":ts}}
+# "Beni Hatirla" isaretliyse genisletilmis sinirlar (cerez Max-Age = azami).
+HATIRLA_BOSTA_SN = int(os.environ.get("HATIRLA_BOSTA_SN", 7 * 24 * 3600))    # 7 gun
+HATIRLA_AZAMI_SN = int(os.environ.get("HATIRLA_AZAMI_SN", 30 * 24 * 3600))   # 30 gun
+_OTURUMLAR = {}                       # {token: {"kid","baslangic","son","bosta","azami"}}
 
 # --- Giris deneme sinirlama (brute-force korumasi) -------------------------- #
 # IP basina art arda hatali girisler; esik asilinca o IP kisa sure kilitlenir.
@@ -75,7 +78,9 @@ def _token_al(handler):
 
 
 def _oturum_suresi_doldu(o, now):
-    return (now - o["son"] > OTURUM_BOSTA_SN) or (now - o["baslangic"] > OTURUM_AZAMI_SN)
+    bosta = o.get("bosta", OTURUM_BOSTA_SN)
+    azami = o.get("azami", OTURUM_AZAMI_SN)
+    return (now - o["son"] > bosta) or (now - o["baslangic"] > azami)
 
 
 def _oturum_kiraci(handler):
@@ -706,11 +711,16 @@ def api_kurulum(body):
 
 
 def api_ofis(donem=None):
-    """Ofis panosu: tum musteriler + secili donem ozetleri."""
+    """Ofis panosu: AKTIF musteriler + secili donem ozetleri; arsivdekiler ayri."""
     donem = donem or AKTIF_DONEM
     kodlar = M.kodlar()
-    out = []
+    out, arsiv = [], []
     for m in depo.musterileri_getir():
+        if not m.get("aktif", True):
+            arsiv.append({"id": m["id"], "unvan": m.get("unvan", ""),
+                          "erp_tipi": m.get("erp_tipi", ""),
+                          "olusturma": m.get("olusturma", "")})
+            continue
         d = depo.donem_getir(m["id"], donem, kodlar)
         bulgu = sum(x.get("bulgu_sayisi", 0) for x in d["moduller"].values())
         out.append({**m, "genel_ilerleme": d["genel_ilerleme"],
@@ -718,6 +728,7 @@ def api_ofis(donem=None):
     # Bu kiracinin sahip oldugu URUN modulleri (ay_kapanis/mutabakat) - sekme gosterimi icin.
     urun_kodlar = kiraci.kiraci_moduller(depo.aktif_kiraci())
     return {"donem": donem, "donemler": DONEMLER, "musteriler": out,
+            "arsiv": arsiv,
             "urun_moduller": urun_kodlar,
             "urun_modul_adlar": {k: kiraci.MODULLER[k] for k in urun_kodlar}}
 
@@ -816,8 +827,17 @@ def api_modul(musteri_id, donem, kod):
     return {"html": mod.panel_html(sonuc)}
 
 
+def _ayar_sansur(a):
+    """API yanitlarinda sifreli ERP kimligi geri donmez (geri donusu de yok;
+    yalniz sunucu icinde cozulur). Diskteki kayit etkilenmez."""
+    a = dict(a)
+    a.pop("erp_kimlik_sifreli", None)
+    return a
+
+
 def api_ayarlar_oku():
-    return {"ok": True, "ayarlar": ayarlar.oku(), "varsayilan": ayarlar.VARSAYILAN}
+    return {"ok": True, "ayarlar": _ayar_sansur(ayarlar.oku()),
+            "varsayilan": _ayar_sansur(ayarlar.VARSAYILAN)}
 
 
 def _sayi(v, vars):
@@ -862,7 +882,7 @@ def api_ayarlar_yaz(body):
     if "kdv_tutar_tolerans" in body:
         yeni["kdv_tutar_tolerans"] = max(0.0, _sayi(body["kdv_tutar_tolerans"], mevcut["kdv_tutar_tolerans"]))
 
-    return {"ok": True, "ayarlar": ayarlar.yaz(yeni)}
+    return {"ok": True, "ayarlar": _ayar_sansur(ayarlar.yaz(yeni))}
 
 
 def api_musteri_ekle(body):
@@ -872,10 +892,41 @@ def api_musteri_ekle(body):
     return {"ok": True, "musteri": m}
 
 
+def api_musteri_arsiv(body):
+    """Musteriyi arsive alir / arsivden cikarir (veri durur, panodan gizlenir).
+    Yetki: onay yetkisi olanlar (Ofis Yoneticisi + Muhasebe Muduru)."""
+    if not depo.yetkili_mi("onay"):
+        return {"hata": "Müşteri arşivleme yetkisi Yönetici/Müdürdedir."}
+    m = depo.musteri_arsiv_ayarla(body.get("m"), bool(body.get("arsiv", True)))
+    if not m:
+        return {"hata": "Müşteri bulunamadı."}
+    return {"ok": True, "id": m["id"], "aktif": m.get("aktif", True)}
+
+
+def api_musteri_sil(body):
+    """Musteriyi KALICI siler (kayit + tum donem/yukleme verisi).
+    Korumalar: yalniz Ofis Yoneticisi; unvanin AYNEN yazilarak onaylanmasi;
+    kilitli donem varsa engel (depo.musteri_sil). Geri donusu yoktur —
+    musteri ofisten ayrildiysa dogru yol SILMEK DEGIL ARSIVLEMEKTIR."""
+    if not depo.yonetici_mi():
+        return {"hata": "Kalıcı silme yetkisi yalnızca Ofis Yöneticisinde."}
+    m = depo.musteri_getir(body.get("m"))
+    if not m:
+        return {"hata": "Müşteri bulunamadı."}
+    beklenen = (m.get("unvan") or "").strip()
+    yazilan = (body.get("onay_unvan") or "").strip()
+    if not beklenen or yazilan != beklenen:
+        return {"hata": "Onay için müşteri ünvanını aynen yazmalısınız."}
+    return depo.musteri_sil(m["id"])
+
+
 def api_yukle(body):
     """Modul icin dosya yukler (base64). Kaydeder; modulu hemen calistirir.
     rol verilirse cok-slotlu modul (or. cari bizim/karsi) icin ayri slot."""
     musteri_id = body.get("m"); donem = body.get("d"); kod = body.get("kod")
+    mk = depo.musteri_getir(musteri_id)
+    if mk and not mk.get("aktif", True):
+        return {"hata": "Müşteri arşivde — dosya yüklemek için önce arşivden çıkarın."}
     if depo.donem_kilitli_mi(musteri_id, donem):
         return {"hata": "Dönem kilitli — yeni dosya yüklenemez. Önce kilidi açın."}
     rol = body.get("rol")
@@ -1171,11 +1222,14 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def _oturum_kur(self, token, hedef="/"):
-        """Basarili giriste cerez koyar ve hedefe yonlendirir."""
+    def _oturum_kur(self, token, hedef="/", max_age=None):
+        """Basarili giriste cerez koyar ve hedefe yonlendirir.
+        max_age verilirse kalici cerez (Beni Hatirla); verilmezse oturumluk."""
         guvenli = "; Secure" if BULUT else ""
+        kalici = f"; Max-Age={int(max_age)}" if max_age else ""
         self.send_response(302)
-        self.send_header("Set-Cookie", f"oturum={token}; Path=/; HttpOnly; SameSite=Lax{guvenli}")
+        self.send_header("Set-Cookie",
+                         f"oturum={token}; Path=/; HttpOnly; SameSite=Lax{guvenli}{kalici}")
         self.send_header("Location", hedef)
         self.end_headers()
 
@@ -1212,6 +1266,21 @@ class Handler(BaseHTTPRequestHandler):
                 if p == "/api/kiracilar":
                     return self._gonder(api_kiracilar())
                 return self._gonder({"hata": "bulunamadi"}, code=404)
+            # --- Karsi taraf PORTALI: oturumsuz ama IMZALI token ile -------------
+            # Maildeki link tok=<kid.imza> tasir; imza (kiraci,cari,mukellef)
+            # uclusune baglidir. Gecerliyse yalniz portal rotalari, o kiracinin
+            # kapsaminda ve o cariyle sinirli servis edilir (bkz. app_logic).
+            if p.startswith("/mutabakat/"):
+                pub = mutabakat.portal_coz(p[len("/mutabakat"):], q, post=False)
+                if pub:
+                    if "mutabakat" not in kiraci.kiraci_moduller(pub["kid"]):
+                        return self._gonder({"hata": "Modül etkin değil."}, code=403)
+                    depo.kiraci_ayarla(pub["kid"])
+                    kod, ctype, govde = mutabakat.dispatch_get(
+                        p[len("/mutabakat"):], q, _istemci_ip(self),
+                        host=self.headers.get("Host", ""), public=pub)
+                    return self._gonder(govde, ctype, kod)
+
             if not p.startswith("/static/"):
                 kid = _oturum_kiraci(self)
                 if kid is None:
@@ -1224,21 +1293,29 @@ class Handler(BaseHTTPRequestHandler):
             if p in ("/", "/index.html"):
                 if _kurulum_gerekli():
                     return self._yonlendir("/kurulum")
+                urunler = kiraci.kiraci_moduller(depo.aktif_kiraci())
                 # Kiraci birden fazla urune sahipse once urun secim ekranini goster.
-                if len(kiraci.kiraci_moduller(depo.aktif_kiraci())) >= 2:
+                if len(urunler) >= 2:
                     return self._gonder(_dosya_oku(os.path.join(TPL, "urun_secim.html")),
                                         "text/html; charset=utf-8")
+                # Tek urun: hangisiyse ona git (mutabakat-only kiraci ay-kapanisa dusmesin).
+                if urunler == ["mutabakat"]:
+                    return self._yonlendir("/mutabakat/ofis")
                 return self._yonlendir("/ay-kapanis")
             if p in ("/ay-kapanis", "/ay-kapanis.html"):
                 if _kurulum_gerekli():
                     return self._yonlendir("/kurulum")
+                # Urun sahipligi: mutabakat ile ayni kural (capraz satis bayragi iki yonlu).
+                if "ay_kapanis" not in kiraci.kiraci_moduller(depo.aktif_kiraci()):
+                    return self._yonlendir("/")
                 return self._gonder(_dosya_oku(os.path.join(TPL, "ofis_panosu.html")),
                                     "text/html; charset=utf-8")
             if p == "/mutabakat" or p.startswith("/mutabakat/"):
                 if "mutabakat" not in kiraci.kiraci_moduller(depo.aktif_kiraci()):
                     return self._yonlendir("/")
                 sub = p[len("/mutabakat"):]   # "" | "/ofis" | "/api/yukle" ...
-                kod, ctype, govde = mutabakat.dispatch_get(sub, q, _istemci_ip(self))
+                kod, ctype, govde = mutabakat.dispatch_get(sub, q, _istemci_ip(self),
+                                                           host=self.headers.get("Host", ""))
                 return self._gonder(govde, ctype, kod)
             if p == "/kurulum":
                 if not _kurulum_gerekli():
@@ -1309,6 +1386,7 @@ class Handler(BaseHTTPRequestHandler):
             params = parse_qs(ham.decode("utf-8", "replace"))
             eposta = (params.get("eposta") or [""])[0]
             parola = (params.get("parola") or [""])[0]
+            hatirla = bool((params.get("beni_hatirla") or [""])[0])
             # Once platform sahibi kimligi denenir; degilse kiraci girisi.
             if _platform_dogrula(eposta, parola):
                 _giris_basarili(ip)
@@ -1319,8 +1397,11 @@ class Handler(BaseHTTPRequestHandler):
             if k:
                 _giris_basarili(ip)
                 t = secrets.token_urlsafe(32)
-                _OTURUMLAR[t] = {"kid": k["id"], "baslangic": now, "son": now}
-                return self._oturum_kur(t, "/")
+                o = {"kid": k["id"], "baslangic": now, "son": now}
+                if hatirla:   # formdaki "Beni Hatirla (30 gun)" gercekten uygulanir
+                    o["bosta"], o["azami"] = HATIRLA_BOSTA_SN, HATIRLA_AZAMI_SN
+                _OTURUMLAR[t] = o
+                return self._oturum_kur(t, "/", max_age=HATIRLA_AZAMI_SN if hatirla else None)
             _giris_basarisiz(ip, now)
             return self._yonlendir("/giris?hata=1")
         # --- Veri geri yukleme (platform sahibi): lokal veri/ -> bulut volume ---
@@ -1349,7 +1430,12 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 _hata_logla("POST /api/veri_geri_yukle", e)
                 return self._gonder({"hata": str(e)}, code=500)
-        body = json.loads(ham or b"{}")
+        try:
+            body = json.loads(ham or b"{}")
+            if not isinstance(body, dict):
+                body = {}
+        except Exception:
+            return self._gonder({"hata": "Geçersiz JSON gövdesi."}, code=400)
         # --- Platform yonetim POST'lari: kiraci gate'inden ONCE ---
         if p.startswith("/api/kiraci"):
             if not _platform_mi(self):
@@ -1367,6 +1453,22 @@ class Handler(BaseHTTPRequestHandler):
                 _hata_logla(f"POST {p}", e)
                 return self._gonder({"hata": str(e)}, code=500)
             return self._gonder({"hata": "bulunamadi"}, code=404)
+        # --- Karsi taraf PORTALI (POST): oturumsuz, imzali token govdede ---
+        if p.startswith("/mutabakat/"):
+            pub = mutabakat.portal_coz(p[len("/mutabakat"):], body, post=True)
+            if pub:
+                if "mutabakat" not in kiraci.kiraci_moduller(pub["kid"]):
+                    return self._gonder({"hata": "Modül etkin değil."}, code=403)
+                depo.kiraci_ayarla(pub["kid"])
+                try:
+                    kod, ctype, govde = mutabakat.dispatch_post(
+                        p[len("/mutabakat"):], body, _istemci_ip(self),
+                        self.headers.get("User-Agent", ""),
+                        host=self.headers.get("Host", ""), public=pub)
+                except Exception as e:
+                    _hata_logla(f"POST {p}", e)
+                    return self._gonder({"hata": str(e)}, code=500)
+                return self._gonder(govde, ctype, kod)
         kid = _oturum_kiraci(self)
         if kid is None:
             return self._gonder({"hata": "Oturum gerekli.", "giris": True}, code=401)
@@ -1375,8 +1477,13 @@ class Handler(BaseHTTPRequestHandler):
             if "mutabakat" not in kiraci.kiraci_moduller(depo.aktif_kiraci()):
                 return self._gonder({"hata": "Bu modül kiracıda etkin değil."}, code=403)
             ua = self.headers.get("User-Agent", "")
-            kod, ctype, govde = mutabakat.dispatch_post(p[len("/mutabakat"):], body,
-                                                        _istemci_ip(self), ua)
+            try:
+                kod, ctype, govde = mutabakat.dispatch_post(p[len("/mutabakat"):], body,
+                                                            _istemci_ip(self), ua,
+                                                            host=self.headers.get("Host", ""))
+            except Exception as e:
+                _hata_logla(f"POST {p}", e)
+                return self._gonder({"hata": str(e)}, code=500)
             return self._gonder(govde, ctype, kod)
         try:
             if p == "/api/kurulum":
@@ -1385,6 +1492,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._gonder(api_erp_test(body))
             if p == "/api/musteri_ekle":
                 return self._gonder(api_musteri_ekle(body))
+            if p == "/api/musteri_arsiv":
+                return self._gonder(api_musteri_arsiv(body))
+            if p == "/api/musteri_sil":
+                return self._gonder(api_musteri_sil(body))
             if p == "/api/yukle":
                 return self._gonder(api_yukle(body))
             if p == "/api/mutabakat_modu":

@@ -39,7 +39,9 @@ def _adaylari_uret(musteri_id, donem):
     if mizan_yol:
         try:
             mizan = mizan_oku.oku(mizan_yol)
-            f = fis_uret.kdv_mahsup_fisi(mizan, f"{donem}-01")
+            # Mahsup fisi DONEM SONU tarihli olmali (ay basi degil) — diger
+            # kapanis fisleriyle ayni kural.
+            f = fis_uret.kdv_mahsup_fisi(mizan, _donem_sonu(donem))
             if f:
                 fisler.append(f)
             fisler.extend(fis_uret.yedi_a_virman_fisleri(mizan, _donem_sonu(donem)))

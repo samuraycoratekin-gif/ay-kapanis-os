@@ -32,11 +32,14 @@ class TestMizandanKDV(unittest.TestCase):
         self.assertAlmostEqual(r["beklenen_devreden"], 95_400, places=2)
 
     def test_devreden_mahsup_uygun(self):
-        # 191/391 kapanmis (mahsup yapilmis), 190 = beklenen devir
+        # 191/391 kapanmis (mahsup yapilmis), 190 = beklenen devir.
+        # Gercek kumule mizanda mahsup, 190'in MAYIS hareketinde gorunur
+        # (72.000 acilis + 23.400 mayis = 95.400); onceki devreden = 72.000.
         m = mizan(
             hesap("191", "INDIRILECEK KDV", toplam=0.0, aylik=[0, 0, 0, 0, 86_400]),
             hesap("391", "HESAPLANAN KDV", toplam=0.0, aylik=[0, 0, 0, 0, -63_000]),
-            hesap("190", "DEVREDEN KDV", toplam=95_400, acilis=72_000),
+            hesap("190", "DEVREDEN KDV", toplam=95_400, acilis=72_000,
+                  aylik=[0, 0, 0, 0, 23_400]),
         )
         r = ka.mizandan_kdv(m)
         self.assertTrue(r["mahsup_yapildi"])

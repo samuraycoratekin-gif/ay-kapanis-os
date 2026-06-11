@@ -128,7 +128,12 @@ def musteri_getir(musteri_id):
 
 def musteri_ekle(unvan, vergi_no="", erp_tipi="Dosya Yükleme"):
     musteriler = musterileri_getir()
-    yeni_id = "M" + str(len(musteriler) + 1).zfill(3)
+    # Cakismayan id: mevcut en buyuk numaranin bir fazlasi — silme sonrasi
+    # guvenli (len+1 olsaydi silinen id yeniden uretilir, eski klasor/durum
+    # yanlis musteriye yapisirdi). kullanici_ekle ile ayni desen.
+    mevcut = [int(m["id"][1:]) for m in musteriler
+              if m.get("id", "").startswith("M") and m["id"][1:].isdigit()]
+    yeni_id = "M" + str((max(mevcut) + 1) if mevcut else 1).zfill(3)
     kayit = {"id": yeni_id, "unvan": unvan, "vergi_no": vergi_no,
              "erp_tipi": erp_tipi, "aktif": True,
              "akilli_mutabakat": False,
@@ -146,6 +151,47 @@ def musteri_guncelle(musteri_id, **alanlar):
             _yaz(_musteriler_json(), musteriler)
             return m
     return None
+
+
+def musteri_arsiv_ayarla(musteri_id, arsiv):
+    """Musteriyi arsive alir (aktif=False) ya da arsivden cikarir.
+    Veri SILINMEZ — defter/kapanis kayitlari yasal saklama suresine tabidir
+    (VUK 5 / TTK 10 yil); panodan gizlemek icin arsiv kullanilir."""
+    return musteri_guncelle(musteri_id, aktif=(not arsiv))
+
+
+def musteri_kilitli_donemleri(musteri_id):
+    """Musterinin kilitli donemlerinin listesi (kalici silme onunde engel)."""
+    kok = os.path.join(_kveri(), "musteriler", musteri_id)
+    kilitli = []
+    if not os.path.isdir(kok):
+        return kilitli
+    for donem in sorted(os.listdir(kok)):
+        durum = _oku(os.path.join(kok, donem, "durum.json"), None)
+        if durum and durum.get("kilitli"):
+            kilitli.append(donem)
+    return kilitli
+
+
+def musteri_sil(musteri_id):
+    """Musteriyi KALICI siler: kayit + tum donem verisi/yuklenen dosyalar.
+    Geri donusu yoktur; cagiran taraf yetki + acik onay almalidir.
+    Kilitli donemi olan musteri silinemez (once kilit acilmali)."""
+    m = musteri_getir(musteri_id)
+    if not m:
+        return {"hata": "Müşteri bulunamadı."}
+    kilitli = musteri_kilitli_donemleri(musteri_id)
+    if kilitli:
+        return {"hata": "Kilitli dönemi olan müşteri silinemez: "
+                        + ", ".join(kilitli) + ". Önce kilidi açın."}
+    with _KILIT:
+        kalan = [x for x in musterileri_getir() if x["id"] != musteri_id]
+        _yaz(_musteriler_json(), kalan)
+        kok = os.path.join(_kveri(), "musteriler", musteri_id)
+        if os.path.isdir(kok):
+            import shutil
+            shutil.rmtree(kok, ignore_errors=True)
+    return {"ok": True, "silinen": musteri_id, "unvan": m.get("unvan", "")}
 
 
 # --------------------------------------------------------------------------- #

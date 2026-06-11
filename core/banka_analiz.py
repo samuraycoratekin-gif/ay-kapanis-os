@@ -39,22 +39,23 @@ def _gun_uygun(a, b, tol):
     return gf is None or gf <= tol
 
 
-def _altkume_bul(hedef_abs, adaylar, gun_hedef):
+def _altkume_bul(hedef_abs, adaylar, gun_hedef, hedef_poz):
     """adaylar (eslesmemis kayitlar) arasindan |toplam| ~ hedef_abs olan en kucuk
-    altkumeyi bulur. Kalemler kendi aralarinda AYNI yonde (hepsi giren / hepsi cikan)
-    ve tarih penceresi icinde olmali. Bulunamazsa None."""
+    altkumeyi bulur. Kalemler HEDEFLE AYNI yonde (giren<->giren / cikan<->cikan)
+    ve tarih penceresi icinde olmali. Bulunamazsa None.
+    (Iki kaynak da ayni isaret kuralina normalize edildiginden ters yonlu
+    kayitlarin birbirini 'kapatmasi' gercek hatalari maskeler — izin verilmez.)"""
     if hedef_abs <= TUTAR_TOL:
         return None
-    for isaret_poz in (True, False):
-        havuz = [d for d in adaylar
-                 if (d["tutar"] >= 0) == isaret_poz
-                 and abs(d["tutar"]) > TUTAR_TOL
-                 and _gun_uygun(gun_hedef, d["tarih"], ALTKUME_GUN_TOL)]
-        havuz = havuz[:ALTKUME_HAVUZ]
-        for n in range(2, min(ALTKUME_MAX, len(havuz)) + 1):
-            for komb in itertools.combinations(havuz, n):
-                if abs(sum(abs(d["tutar"]) for d in komb) - hedef_abs) <= TUTAR_TOL:
-                    return list(komb)
+    havuz = [d for d in adaylar
+             if (d["tutar"] >= 0) == hedef_poz
+             and abs(d["tutar"]) > TUTAR_TOL
+             and _gun_uygun(gun_hedef, d["tarih"], ALTKUME_GUN_TOL)]
+    havuz = havuz[:ALTKUME_HAVUZ]
+    for n in range(2, min(ALTKUME_MAX, len(havuz)) + 1):
+        for komb in itertools.combinations(havuz, n):
+            if abs(sum(abs(d["tutar"]) for d in komb) - hedef_abs) <= TUTAR_TOL:
+                return list(komb)
     return None
 
 
@@ -94,7 +95,10 @@ def esle(banka, defter):
         b["_eslesti"] = False
 
     for b in banka:
+        # Ayni isaret sarti: +giren yalniz +giren ile, -cikan yalniz -cikan ile
+        # eslesebilir (iki kaynak ayni kurala normalize: + = hesaba giren).
         adaylar = [d for d in defter if not d["_eslesti"]
+                   and (d["tutar"] >= 0) == (b["tutar"] >= 0)
                    and abs(abs(d["tutar"]) - abs(b["tutar"])) <= TUTAR_TOL]
         if not adaylar:
             continue
@@ -117,7 +121,7 @@ def esle(banka, defter):
         if b["_eslesti"]:
             continue
         kalan = [d for d in defter if not d["_eslesti"]]
-        alt = _altkume_bul(abs(b["tutar"]), kalan, b["tarih"])
+        alt = _altkume_bul(abs(b["tutar"]), kalan, b["tarih"], b["tutar"] >= 0)
         if alt:
             for d in alt:
                 d["_eslesti"] = True
@@ -129,7 +133,7 @@ def esle(banka, defter):
         if d["_eslesti"]:
             continue
         kalan = [b for b in banka if not b["_eslesti"]]
-        alt = _altkume_bul(abs(d["tutar"]), kalan, d["tarih"])
+        alt = _altkume_bul(abs(d["tutar"]), kalan, d["tarih"], d["tutar"] >= 0)
         if alt:
             for b in alt:
                 b["_eslesti"] = True

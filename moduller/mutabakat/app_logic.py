@@ -7,13 +7,13 @@ kaldirildi; tum yollar AKTIF KIRACIYA gore turetilir:
     veri/kiracilar/<kid>/mutabakat/
 Platform Handler'i /mutabakat/* isteklerini dispatch_get/dispatch_post'a yonlendirir.
 """
-import os, json, base64, threading, random, hashlib, smtplib, ssl, mimetypes
+import os, json, base64, threading, random, hashlib, hmac, smtplib, ssl, mimetypes
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 from email.utils import make_msgid
 from urllib.parse import urlparse, parse_qs
 
-from core import depo, kiraci, ayarlar
+from core import depo, kiraci, ayarlar, kasa
 from . import motor as M, gib as G, durum as D
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -23,8 +23,12 @@ DONEM = "Mayıs 2026"
 FIRMA = "ÖRNEK SANAYİ A.Ş."
 GKEY = "__gonderim__"
 
-OTP_DEPO = {}            # {cari: {"kod","bitis"}}  (bellekte, surec genelinde)
+OTP_DEPO = {}            # {"kid|musteri|cari": {"kod","bitis"}}  (bellekte, surec genelinde)
 OTP_GECERLILIK = 10      # dakika
+
+# Durum/kanit dosya yazimlari icin kilit (ThreadingHTTPServer altinda es zamanli
+# istekler ayni JSON/JSONL'a yazabilir; hash zinciri ve durum bozulmasin).
+_YAZ_KILIT = threading.RLock()
 
 
 # --------------------------------------------------------------------------- #
@@ -53,20 +57,51 @@ def MAIL_AYAR():    return _p("mail_ayar.json")
 def KANIT_LOG():    return _p("kanit_log.jsonl")
 
 
+# Repoyla birlikte gelen sentetik ornek ekstreler. Kiracinin kendi dosyasi
+# yoksa bunlara duser: yeni kiraci (ve bulut) kurulumsuz calisir.
+ORNEK_VERI = os.path.join(HERE, "ornek_veri")
+
+
 def _ornek(anahtar):
     adlar = {"bizim": "bizim_ekstreler.xlsx", "karsi": "karsi_ekstreler.xlsx",
              "gib": "gib_efatura_kayitlari.xlsx"}
-    return os.path.join(_kok(), "ornek", adlar[anahtar])
+    kiraci_yol = os.path.join(_kok(), "ornek", adlar[anahtar])
+    if os.path.exists(kiraci_yol):
+        return kiraci_yol
+    return os.path.join(ORNEK_VERI, adlar[anahtar])
 
 
 def _yol_coz(yol, anahtar):
     if yol:
-        return yol if os.path.isabs(yol) else os.path.join(_kok(), yol)
+        p = yol if os.path.isabs(yol) else os.path.join(_kok(), yol)
+        if os.path.exists(p):
+            return p
+        # Kiraci kopyasi yoksa ayni ada sahip paketlenmis ornege dus
+        # (or. "ornek/muk015_bizim.xlsx" -> moduller/mutabakat/ornek_veri/muk015_bizim.xlsx)
+        paket = os.path.join(ORNEK_VERI, os.path.basename(p))
+        if os.path.exists(paket):
+            return paket
+        return p
     return _ornek(anahtar)
 
 
+def _istek_host():
+    """Bu istegi karsilayan Host basligi (app.py dispatch'te set edilir)."""
+    return getattr(_CTX, "host", "") or ""
+
+
 def PORTAL_URL():
-    return (mail_ayar().get("portal_url") or "http://localhost:5050/mutabakat").rstrip("/")
+    """Karsi tarafa giden linklerin koku. Oncelik: mail ayarindaki portal_url >
+    istegin Host'u (bulutta https) > yerel varsayilan. Boylece ayar yapilmasa
+    bile mail linki, ofisin kullandigi gercek adresi gosterir."""
+    ayarli = (mail_ayar().get("portal_url") or "").strip()
+    if ayarli:
+        return ayarli.rstrip("/")
+    host = _istek_host()
+    if host:
+        sema = "https" if os.environ.get("PORT") else "http"
+        return f"{sema}://{host}/mutabakat"
+    return "http://localhost:5050/mutabakat"
 
 
 def _json_oku(yol, varsayilan):
@@ -75,6 +110,14 @@ def _json_oku(yol, varsayilan):
             return json.load(f)
     except Exception:
         return varsayilan
+
+
+def _json_yaz(yol, obj):
+    """Atomik JSON yazimi (gecici dosya + replace)."""
+    gecici = yol + ".tmp"
+    with open(gecici, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=2)
+    os.replace(gecici, yol)
 
 
 def _kiraci_kayit():
@@ -107,8 +150,35 @@ def kiraci_mail():
 _CTX = threading.local()
 
 
+# Kiracida mukellefler.json yoksa kullanilan hazir demo konfig — paketlenmis
+# ornek ekstrelerle (ornek_veri/) calisir; yeni kiraci aninda demo yapabilir.
+VARSAYILAN_MUKELLEFLER = {
+    "_aciklama": "Varsayilan demo mukellefleri (kiraciya ozel mukellefler.json yazilana kadar).",
+    "varsayilan": "MUK-001",
+    "mukellefler": [
+        {"kod": "MUK-001", "unvan": "Demir Çelik Sanayi A.Ş.", "sektor": "Metal / Üretim",
+         "donem": "Mayıs 2026", "m": 18, "i": 1, "b": 1, "motor": True,
+         "veri": {"bizim": "ornek/bizim_ekstreler.xlsx",
+                  "karsi": "ornek/karsi_ekstreler.xlsx",
+                  "gib": "ornek/gib_efatura_kayitlari.xlsx"}},
+        {"kod": "MUK-002", "unvan": "Anadolu Tekstil San. Tic.", "sektor": "Tekstil",
+         "donem": "Mayıs 2026", "m": 24, "i": 0, "b": 0, "motor": False},
+        {"kod": "MUK-003", "unvan": "Gül Plastik Ltd. Şti.", "sektor": "Plastik / Ambalaj",
+         "donem": "Mayıs 2026", "m": 9, "i": 3, "b": 2, "motor": False},
+        {"kod": "MUK-015", "unvan": "Gaziantep Baharat Ltd.", "sektor": "Gıda / Baharat",
+         "donem": "Mayıs 2026", "m": 0, "i": 0, "b": 3, "motor": True,
+         "veri": {"bizim": "ornek/muk015_bizim.xlsx",
+                  "karsi": "ornek/muk015_karsi.xlsx",
+                  "gib": "ornek/muk015_gib.xlsx"}},
+    ],
+}
+
+
 def mukellefler_yukle():
-    return _json_oku(MUKELLEFLER(), {})
+    cfg = _json_oku(MUKELLEFLER(), None)
+    if cfg and cfg.get("mukellefler"):
+        return cfg
+    return VARSAYILAN_MUKELLEFLER
 
 
 def mukellef_listesi():
@@ -225,10 +295,16 @@ def durum_yukle(musteri=None):
 
 
 def durum_kaydet(d, musteri=None):
-    tum = _durum_tum()
-    tum[musteri or aktif_kod()] = d
-    with open(DEMO_DURUM(), "w", encoding="utf-8") as f:
-        json.dump(tum, f, ensure_ascii=False, indent=2)
+    # Kilit + gecici dosya + os.replace: es zamanli iki yanit/yazim durum
+    # dosyasini yarim birakamaz (depo._yaz ile ayni desen).
+    with _YAZ_KILIT:
+        tum = _durum_tum()
+        tum[musteri or aktif_kod()] = d
+        yol = DEMO_DURUM()
+        gecici = yol + ".tmp"
+        with open(gecici, "w", encoding="utf-8") as f:
+            json.dump(tum, f, ensure_ascii=False, indent=2)
+        os.replace(gecici, yol)
 
 
 # --------------------------------------------------------------------------- #
@@ -251,14 +327,16 @@ def _son_hash():
 
 
 def kanit_yaz(kayit):
-    onceki = _son_hash()
-    satir = {"zaman": datetime.now().isoformat(timespec="seconds"), **kayit,
-             "onceki_hash": onceki}
-    ozet_girdi = json.dumps(satir, ensure_ascii=False, sort_keys=True)
-    satir["hash"] = hashlib.sha256(ozet_girdi.encode("utf-8")).hexdigest()
-    with open(KANIT_LOG(), "a", encoding="utf-8") as f:
-        f.write(json.dumps(satir, ensure_ascii=False) + "\n")
-    return satir
+    # Kilit: son-hash okuma + ekleme tek atomik adim olsun (zincir kopmasin).
+    with _YAZ_KILIT:
+        onceki = _son_hash()
+        satir = {"zaman": datetime.now().isoformat(timespec="seconds"), **kayit,
+                 "onceki_hash": onceki}
+        ozet_girdi = json.dumps(satir, ensure_ascii=False, sort_keys=True)
+        satir["hash"] = hashlib.sha256(ozet_girdi.encode("utf-8")).hexdigest()
+        with open(KANIT_LOG(), "a", encoding="utf-8") as f:
+            f.write(json.dumps(satir, ensure_ascii=False) + "\n")
+        return satir
 
 
 def kanit_dogrula():
@@ -328,7 +406,10 @@ def mail_gonder(alici, konu, html, metin=""):
 
 
 def _mail_govde(ck, adi, bakiye):
-    link = f"{PORTAL_URL()}/portal?cari={ck}&musteri={aktif_kod()}"
+    # Link imzali token tasir: karsi taraf oturumsuz acar, token (kiraci, cari,
+    # mukellef) uclusune kilitlidir (bkz. portal_token / app.py public kapisi).
+    link = (f"{PORTAL_URL()}/portal?cari={ck}&musteri={aktif_kod()}"
+            f"&tok={portal_token(ck)}")
     bak = f"{bakiye:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if bakiye is not None else "-"
     return f"""<div style="font-family:Segoe UI,Arial,sans-serif;max-width:560px;margin:auto;
       color:#1a2230;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden">
@@ -387,9 +468,15 @@ def _otp_govde(ck, kod):
     </div>"""
 
 
+def _otp_anahtar(ck):
+    """OTP anahtari kiraci+mukellef+cari uclusudur: iki kiracida ayni cari kodu
+    (or. '120.01') olmasi normaldir; kodlar birbirinin uzerine yazilmamali."""
+    return f"{depo.aktif_kiraci()}|{aktif_kod()}|{ck}"
+
+
 def otp_iste(ck):
     kod = f"{random.randint(0, 999999):06d}"
-    OTP_DEPO[ck] = {"kod": kod, "bitis": datetime.now() + timedelta(minutes=OTP_GECERLILIK)}
+    OTP_DEPO[_otp_anahtar(ck)] = {"kod": kod, "bitis": datetime.now() + timedelta(minutes=OTP_GECERLILIK)}
     alici = cari_mail(ck)
     if mail_aktif_mi():
         konu = f"Doğrulama Kodu · {aktif_donem()} · {aktif_unvan()}"
@@ -405,16 +492,69 @@ def otp_iste(ck):
 
 
 def otp_dogrula(ck, kod):
-    kayit = OTP_DEPO.get(ck)
+    anahtar = _otp_anahtar(ck)
+    kayit = OTP_DEPO.get(anahtar)
     if not kayit:
         return False, "kod istenmedi veya suresi doldu"
     if datetime.now() > kayit["bitis"]:
-        OTP_DEPO.pop(ck, None)
+        OTP_DEPO.pop(anahtar, None)
         return False, "kodun suresi doldu"
     if (kod or "").strip() != kayit["kod"]:
         return False, "kod hatali"
-    OTP_DEPO.pop(ck, None)
+    OTP_DEPO.pop(anahtar, None)
     return True, ""
+
+
+# --------------------------------------------------------------------------- #
+# Karsi taraf PORTAL erisimi — oturumsuz, IMZALI baglanti (token)
+#
+# Maildeki linke tiklayan karsi tarafin platform oturumu yoktur; portal ve
+# portala hizmet eden dar API kumesi, linkteki HMAC imzali token ile acilir.
+# Token (kid|cari|musteri) uclusune baglidir: baska kiraci/cari/mukellef icin
+# kullanilamaz. Anahtar kasa anahtarindan turetilir (KASA_ANAHTARI env'i).
+# Token mutabakat donemi boyunca gecerlidir (mail linki gunlerce sonra
+# acilabilir); yanitin kendisi ayrica OTP ile dogrulanir.
+# --------------------------------------------------------------------------- #
+PORTAL_GET_ACIK = {"/portal", "/portal.html", "/api/form", "/api/maildurum",
+                   "/api/itiraz", "/api/cari_fark"}
+PORTAL_POST_ACIK = {"/api/otp_iste", "/api/yanit"}
+
+
+def _portal_imza(kid, ck, musteri):
+    mesaj = f"{kid}|{ck}|{musteri}".encode("utf-8")
+    return hmac.new(kasa._anahtar(), mesaj, hashlib.sha256).hexdigest()[:32]
+
+
+def portal_token(ck, musteri=None, kid=None):
+    """Karsi tarafa gonderilecek linkin imzasi. kid varsayilani aktif kiraci."""
+    kid = kid or depo.aktif_kiraci()
+    musteri = musteri if musteri is not None else aktif_kod()
+    return f"{kid}.{_portal_imza(kid, ck, musteri)}"
+
+
+def portal_coz(sub, params, post=False):
+    """Public istek dogrulama. params: GET'te query dict (list degerli),
+    POST'ta body dict. Gecerliyse {"kid","cari","musteri"} doner; degilse None."""
+    izinli = PORTAL_POST_ACIK if post else PORTAL_GET_ACIK
+    if (sub or "/") not in izinli:
+        return None
+
+    def _al(ad):
+        v = params.get(ad)
+        if isinstance(v, list):
+            v = v[0] if v else ""
+        return (v or "").strip()
+
+    tok, ck, musteri = _al("tok"), _al("cari"), _al("musteri")
+    if not tok or not ck or "." not in tok:
+        return None
+    kid, _, imza = tok.partition(".")
+    if not kid or not kiraci.kiraci_getir(kid):
+        return None
+    beklenen = _portal_imza(kid, ck, musteri)
+    if not hmac.compare_digest(imza, beklenen):
+        return None
+    return {"kid": kid, "cari": ck, "musteri": musteri}
 
 
 # --------------------------------------------------------------------------- #
@@ -548,6 +688,11 @@ def gonder_tur(secili=None):
             kanit_yaz({"olay": "FORM_GONDERILDI", "cari": ck, "adi": a["cari_adi"],
                        "alici": alici, "tur": tur, "kacinci": y["gonderim"],
                        "message_id": mid, "sonuc": "gonderildi" if mail_ok else f"hata: {mail_hata}"})
+        else:
+            # Demo modunda da gonderim KANITA islenir — kanit zinciri eksiksiz kalsin.
+            kanit_yaz({"olay": "FORM_GONDERILDI", "cari": ck, "adi": a["cari_adi"],
+                       "alici": alici, "tur": tur, "kacinci": y["gonderim"],
+                       "kanal": "demo", "sonuc": "demo_gonderim (mail kapali)"})
         d[ck] = y
         gonderilen.append({"cari": ck, "adi": a["cari_adi"], "kacinci": y["gonderim"],
                            "mail": alici, "mail_ok": mail_ok,
@@ -951,13 +1096,99 @@ def _sayfa(adi):
 
 
 # --------------------------------------------------------------------------- #
+# Mail / portal ayarlari (yalniz OTURUMLU ofis kullanicisi; public kapidan
+# erisilemez — PORTAL_*_ACIK kumelerinde yoktur).
+# --------------------------------------------------------------------------- #
+def api_mailayar_oku():
+    a = mail_ayar()
+    cfg = _json_oku(CARI_MAIL(), {})
+    return {"ok": True,
+            "smtp_user": (a.get("smtp_user") or "").strip() or kiraci_mail(),
+            "app_sifre_kayitli": bool((a.get("smtp_app_sifre") or "").strip()),
+            "portal_url": (a.get("portal_url") or "").strip(),
+            "portal_efektif": PORTAL_URL(),
+            "gonderici_ad": cfg.get("_gonderici_ad", "") or aktif_unvan(),
+            "varsayilan_karsi": cfg.get("varsayilan_karsi", ""),
+            "cariler": cfg.get("cariler", {}),
+            "mail_aktif": mail_aktif_mi()}
+
+
+def api_mailayar_yaz(body, ip="", ua=""):
+    """SMTP + portal + varsayilan karsi mail ayarlarini yazar.
+    App sifresi yalniz doluysa guncellenir (bos = mevcut korunur); yanitlarda
+    sifre asla geri donmez, kanita da yazilmaz."""
+    sifre = (body.get("smtp_app_sifre") or "").strip()
+    with _YAZ_KILIT:
+        a = mail_ayar()
+        if "smtp_user" in body:
+            a["smtp_user"] = (body.get("smtp_user") or "").strip()
+        if sifre:
+            a["smtp_app_sifre"] = sifre
+        if body.get("sifre_sil"):
+            a["smtp_app_sifre"] = ""
+        if "portal_url" in body:
+            a["portal_url"] = (body.get("portal_url") or "").strip()
+        _json_yaz(MAIL_AYAR(), a)
+
+        cfg = _json_oku(CARI_MAIL(), {})
+        if "gonderici_ad" in body:
+            cfg["_gonderici_ad"] = (body.get("gonderici_ad") or "").strip()
+        if "varsayilan_karsi" in body:
+            cfg["varsayilan_karsi"] = (body.get("varsayilan_karsi") or "").strip()
+        cariler = body.get("cariler")
+        if isinstance(cariler, dict):
+            mevcut = cfg.get("cariler", {})
+            for k, v in cariler.items():
+                v = (v or "").strip()
+                if v:
+                    mevcut[str(k)] = v
+                else:
+                    mevcut.pop(str(k), None)
+            cfg["cariler"] = mevcut
+        _json_yaz(CARI_MAIL(), cfg)
+    degisen = [k for k in ("smtp_user", "portal_url", "gonderici_ad",
+                           "varsayilan_karsi", "cariler", "sifre_sil") if k in body]
+    if sifre:
+        degisen.append("smtp_app_sifre(guncellendi)")
+    kanit_yaz({"olay": "MAIL_AYAR_GUNCELLENDI", "alanlar": degisen, "ip": ip, "tarayici": ua})
+    return api_mailayar_oku()
+
+
+# --------------------------------------------------------------------------- #
 # Platform Handler'inin /mutabakat/* icin cagirdigi dispatch arayuzu.
 # Donus: (kod:int, ctype:str, govde:bytes)
+#
+# public: app.py'nin imzali token ile dogruladigi oturumsuz karsi-taraf istegi
+#         ({"kid","cari","musteri"}). Bu modda YALNIZ portal rotalari servis
+#         edilir; cari/mukellef token'dakine SABITLENIR (parametre oynamasi
+#         baska cariyi acamaz) ve maildurum yalniz aktiflik bayragi doner.
 # --------------------------------------------------------------------------- #
-def dispatch_get(subpath, query, ip=""):
-    set_aktif((query.get("musteri") or [None])[0])
+def dispatch_get(subpath, query, ip="", host="", public=None):
+    _CTX.host = host
+    if public:
+        set_aktif(public.get("musteri") or None)
+    else:
+        set_aktif((query.get("musteri") or [None])[0])
     p = subpath or "/"
     try:
+        if public:
+            if p not in PORTAL_GET_ACIK:
+                return 404, _JSON, _jb({"hata": "bulunamadi"})
+            pck = public.get("cari", "")
+            if p in ("/portal", "/portal.html"):
+                return 200, _HTML, _sayfa("karsi_taraf_portal.html")
+            if p == "/api/form":
+                d = asama_form()
+                d["cariler"] = [c for c in d.get("cariler", []) if c.get("cari") == pck]
+                return 200, _JSON, _jb(d)
+            if p == "/api/maildurum":
+                return 200, _JSON, _jb({"aktif": mail_aktif_mi()})
+            if p == "/api/itiraz":
+                return 200, _JSON, _jb(itiraz_analiz(pck))
+            if p == "/api/cari_fark":
+                return 200, _JSON, _jb(cari_fark(pck))
+            return 404, _JSON, _jb({"hata": "bulunamadi"})
+
         if p in ("", "/", "/index.html"):
             return 200, _HTML, _sayfa("index.html")
         if p in ("/portal", "/portal.html"):
@@ -978,6 +1209,8 @@ def dispatch_get(subpath, query, ip=""):
             return 200, _JSON, _jb(cari_fark((query.get("cari") or [""])[0]))
         if p == "/api/caprazcari":
             return 200, _JSON, _jb(caprazcari_tara())
+        if p == "/api/mailayar":
+            return 200, _JSON, _jb(api_mailayar_oku())
         if p == "/api/maildurum":
             cfg = _json_oku(CARI_MAIL(), {})
             return 200, _JSON, _jb({"aktif": mail_aktif_mi(),
@@ -1007,20 +1240,34 @@ def dispatch_get(subpath, query, ip=""):
         return 500, _JSON, _jb({"hata": str(e)})
 
 
-def dispatch_post(subpath, body, ip="", ua=""):
-    set_aktif(body.get("musteri"))
+def dispatch_post(subpath, body, ip="", ua="", host="", public=None):
+    _CTX.host = host
+    if public:
+        set_aktif(public.get("musteri") or None)
+        # Token hangi cari icin imzalandiysa yanit O cariye yazilir.
+        body = dict(body)
+        body["cari"] = public.get("cari", "")
+        body["musteri"] = public.get("musteri", "")
+    else:
+        set_aktif(body.get("musteri"))
     p = subpath or "/"
     try:
+        if public and p not in PORTAL_POST_ACIK:
+            return 404, _JSON, _jb({"hata": "bulunamadi"})
         if p == "/api/yanit":
             return 200, _JSON, _jb(kaydet_yanit(body, ip, ua))
         if p == "/api/otp_iste":
             return 200, _JSON, _jb(otp_iste(body.get("cari")))
+        if public:
+            return 404, _JSON, _jb({"hata": "bulunamadi"})
         if p == "/api/manuel_esle":
             return 200, _JSON, _jb(manuel_esle(body, ip, ua))
         if p == "/api/manuel_geri":
             return 200, _JSON, _jb(manuel_geri(body, ip, ua))
         if p == "/api/gonder":
             return 200, _JSON, _jb(gonder_tur(body.get("secili")))
+        if p == "/api/mailayar":
+            return 200, _JSON, _jb(api_mailayar_yaz(body, ip, ua))
         if p == "/api/mailtest":
             alici = body.get("alici") or _json_oku(CARI_MAIL(), {}).get("varsayilan_karsi", "")
             html = _mail_govde("TEST", "Test Alicisi", 12345.67)

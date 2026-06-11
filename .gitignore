@@ -2,6 +2,12 @@
 veri/
 *.tmp
 
+# Yerel veri yedekleri ve indirilen araclar — repoya gitmez
+# (zip icinde veri/ kopyasi olabilir: KVKK; exe 54MB: gereksiz sisirme)
+*.zip
+cloudflared.exe
+veri_yedek*/
+
 # Gecici sunucu cikti dokumleri
 _srv_*.txt
 

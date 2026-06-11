@@ -13,7 +13,6 @@ DERIN MOD (musteri Akilli Mutabakat urunune de sahipse):
 
 Isaret: net = borc(+) FATURA - alacak(-) ODEME. Iki defter de ayni isaret kurali.
 """
-import os, sys
 from datetime import datetime, date
 
 TOLERANS = 1.0   # TL; bu altindaki net fark "mutabik" sayilir
@@ -163,16 +162,13 @@ def yaslandirma(bizim_kayit, bugun=None):
 # DERIN MOD (Akilli Mutabakat motoru kopru)
 # --------------------------------------------------------------------------- #
 def _motor():
-    """Komsu Mutabakat_AI klasorunden motoru import eder; yoksa None."""
-    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Ay_Kapanis_OS
-    kok = os.path.dirname(here)                                         # YAPAY ZEKA...
-    yol = os.path.join(kok, "Mutabakat_AI")
-    if not os.path.isdir(yol):
-        return None
-    if yol not in sys.path:
-        sys.path.insert(0, yol)
+    """Gomulu Akilli Mutabakat motorunu (moduller/mutabakat/motor.py) import eder.
+
+    Eski surum komsu ../Mutabakat_AI klasorune bakiyordu; bulutta (Railway) o
+    klasor olmadigindan derin mod sessizce devre disi kaliyordu. Motor artik
+    repo icinde — her ortamda ayni motor calisir."""
     try:
-        import mutabakat_motoru as mm
+        from moduller.mutabakat import motor as mm
         return mm
     except Exception:
         return None

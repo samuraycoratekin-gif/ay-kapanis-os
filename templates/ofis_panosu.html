@@ -90,6 +90,25 @@
           <tbody id="musteri-tablo"></tbody>
         </table>
       </div>
+      <!-- Arsivdeki musteriler: veri durur, panoda gizlenir. Kalici silme
+           yalniz buradan, unvan yazilarak onaylanir (yasal saklama uyarisiyla). -->
+      <div id="arsiv-bolum" style="display:none;margin-top:14px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;">
+        <div style="display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="arsivAcKapa()">
+          <i class="fa-solid fa-box-archive" style="color:var(--text-muted)"></i>
+          <span style="font-weight:600;">Arşivdeki müşteriler <span class="badge neutral" id="arsiv-sayi">0</span></span>
+          <i class="fa-solid fa-chevron-down" id="arsiv-ok" style="color:var(--text-muted);font-size:12px;"></i>
+        </div>
+        <div id="arsiv-govde" style="display:none;margin-top:10px;">
+          <table>
+            <thead><tr><th>Kod</th><th>Ünvan</th><th>ERP</th><th>Eklenme</th><th style="text-align:right;">İşlem</th></tr></thead>
+            <tbody id="arsiv-tablo"></tbody>
+          </table>
+          <p style="margin-top:8px;font-size:12px;color:var(--text-muted);">
+            <i class="fa-solid fa-circle-info"></i> Arşivdeki müşterinin verisi korunur (defter kayıtları yasal saklamaya tabidir
+            — VUK 5 / TTK 10 yıl). <strong>Kalıcı Sil</strong> tüm dönem verisini ve yüklenen dosyaları geri dönüşsüz kaldırır;
+            yalnızca Ofis Yöneticisi, ünvanı aynen yazarak onaylayabilir.</p>
+        </div>
+      </div>
     </div>
 
     <div class="panel" style="margin-top:18px;">
@@ -222,6 +241,7 @@
       document.getElementById('s-devam').innerText = d.musteriler.filter(m => m.genel_ilerleme > 0 && m.genel_ilerleme < 100).length;
       document.getElementById('s-bulgu').innerText = d.musteriler.reduce((t,m) => t + m.bulgu, 0);
 
+      const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
       const tb = document.getElementById('musteri-tablo');
       tb.innerHTML = d.musteriler.map(m => `
         <tr class="row-link" onclick="location.href='/kokpit?m=${m.id}&d=${DONEM}'">
@@ -236,7 +256,35 @@
           </td>
           <td>${m.bulgu > 0 ? `<span class="badge err">${m.bulgu}</span>` : `<span class="badge success">temiz</span>`}</td>
           <td>${sonTarihHtml(m)}</td>
-          <td><i class="fa-solid fa-chevron-right" style="color:var(--text-muted)"></i></td>
+          <td onclick="event.stopPropagation()" style="white-space:nowrap;text-align:right;">
+            <button class="btn-sec" title="Arşivle — veri korunur, panodan gizlenir"
+              data-id="${m.id}" data-unvan="${esc(m.unvan)}" onclick="musteriArsivle(this)">
+              <i class="fa-solid fa-box-archive"></i></button>
+            <i class="fa-solid fa-chevron-right" style="color:var(--text-muted);margin-left:8px;"></i>
+          </td>
+        </tr>`).join('');
+
+      // --- Arsiv bolumu ---
+      const ab = document.getElementById('arsiv-bolum');
+      const at = document.getElementById('arsiv-tablo');
+      const liste = d.arsiv || [];
+      document.getElementById('arsiv-sayi').innerText = liste.length;
+      ab.style.display = liste.length ? 'block' : 'none';
+      at.innerHTML = liste.map(m => `
+        <tr>
+          <td>${m.id}</td>
+          <td><strong style="color:var(--text-muted)">${m.unvan}</strong></td>
+          <td><span class="badge neutral">${m.erp_tipi || '—'}</span></td>
+          <td>${m.olusturma || '—'}</td>
+          <td style="white-space:nowrap;text-align:right;">
+            <button class="btn-sec" title="Arşivden çıkar (panoya geri al)"
+              data-id="${m.id}" onclick="musteriArsivCikar(this)">
+              <i class="fa-solid fa-rotate-left"></i> Geri Al</button>
+            <button class="btn-sec" style="color:var(--accent-rose);border-color:rgba(244,63,94,.4);"
+              title="KALICI sil — tüm dönem verisi ve dosyalar geri dönüşsüz silinir"
+              data-id="${m.id}" data-unvan="${esc(m.unvan)}" onclick="musteriSil(this)">
+              <i class="fa-solid fa-trash"></i> Kalıcı Sil</button>
+          </td>
         </tr>`).join('');
     }
     async function musteriEkle() {
@@ -245,6 +293,43 @@
       const vergi = prompt("Vergi no (opsiyonel):") || "";
       await fetch('/api/musteri_ekle', {method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({unvan, vergi_no: vergi})});
+      yukle();
+    }
+    function arsivAcKapa() {
+      const g = document.getElementById('arsiv-govde');
+      const ac = g.style.display === 'none';
+      g.style.display = ac ? 'block' : 'none';
+      document.getElementById('arsiv-ok').className =
+        'fa-solid ' + (ac ? 'fa-chevron-up' : 'fa-chevron-down');
+    }
+    async function musteriArsivle(btn) {
+      const id = btn.dataset.id, unvan = btn.dataset.unvan;
+      if (!confirm(`"${unvan}" arşive alınsın mı?\n\nVerisi korunur, panodan gizlenir; istediğiniz an geri alabilirsiniz.`)) return;
+      const r = await fetch('/api/musteri_arsiv', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({m: id, arsiv: true})});
+      const d = await r.json();
+      if (d.hata) { alert(d.hata); return; }
+      yukle();
+    }
+    async function musteriArsivCikar(btn) {
+      const r = await fetch('/api/musteri_arsiv', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({m: btn.dataset.id, arsiv: false})});
+      const d = await r.json();
+      if (d.hata) { alert(d.hata); return; }
+      yukle();
+    }
+    async function musteriSil(btn) {
+      const id = btn.dataset.id, unvan = btn.dataset.unvan;
+      const yazilan = prompt(
+        `KALICI SİLME — geri dönüşü YOKTUR.\n\n"${unvan}" müşterisinin tüm dönem verileri ve yüklenen dosyalar silinecek.\n` +
+        `Defter kayıtları yasal saklamaya tabidir (VUK 5 / TTK 10 yıl) — emin değilseniz Arşiv'de bırakın.\n\n` +
+        `Onaylamak için müşteri ünvanını AYNEN yazın:`);
+      if (yazilan === null) return;
+      const r = await fetch('/api/musteri_sil', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({m: id, onay_unvan: yazilan})});
+      const d = await r.json();
+      if (d.hata) { alert(d.hata); return; }
+      alert(`"${d.unvan}" kalıcı olarak silindi.`);
       yukle();
     }
     // --- Tarama Ayarlari ---

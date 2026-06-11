@@ -36,6 +36,25 @@ def _tl(v):
 # --------------------------------------------------------------------------- #
 # 1) Mizandan KDV pozisyonu
 # --------------------------------------------------------------------------- #
+def devreden_onceki_190(mizan):
+    """Bu ayin mahsubu ONCESI 190 Devreden KDV bakiyesi.
+
+    Yil icinde devir olusan firmada 'onceki donemden devreden' = yilbasi ACILISI
+    degil, gecen ay sonu bakiyesidir. Kumule formatta bu, acilis + guncel ay
+    HARIC tum aylarin net hareketidir (guncel ayin mahsup fisi atilmis olsa
+    bile o hareket dislanir). Standart (tek bakiye kolonlu) mizanda ay kirilimi
+    olmadigindan mevcut 190 bakiyesi en iyi yaklasimdir."""
+    o = mizan.get("hesaplar", {}).get("190")
+    if not o:
+        return 0.0
+    ay = mizan.get("guncel_ay")
+    aylik = o.get("aylik") or {}
+    if ay and aylik:
+        onceki = sum((v or 0) for a, v in aylik.items() if a != ay)
+        return abs(round((o.get("acilis") or 0) + onceki, 2))
+    return abs(round(o.get("toplam", 0.0) or 0.0, 2))
+
+
 def mizandan_kdv(mizan):
     h = mizan["hesaplar"]
     ay = mizan.get("guncel_ay")
@@ -61,7 +80,7 @@ def mizandan_kdv(mizan):
 
     indirilecek = abs(hareket("191"))
     hesaplanan = abs(hareket("391"))
-    devreden_onceki = abs(acilis("190"))      # onceki donemden devir
+    devreden_onceki = devreden_onceki_190(mizan)   # gecen ay sonu devri (acilis degil)
     devreden_son = abs(bakiye("190"))         # mizandaki guncel 190 bakiyesi
     odenecek_hesap = bakiye("360")            # 360 Odenecek Vergi/Fonlar (KDV disi de icerebilir)
 
@@ -313,7 +332,8 @@ def tevkifat(kalemler):
     t_matrah = t_kdv = t_tevkif = t_indir = 0.0
     for k in kalemler:
         matrah = float(k["matrah"])
-        orani = k.get("kdv_orani") or KDV_ORAN
+        orani = k.get("kdv_orani")
+        orani = KDV_ORAN if orani is None else float(orani)   # 0 gecerli orandir
         kdv = round(matrah * orani, 2)
         coz = _oran_coz(k.get("oran_ham"))
         if coz:

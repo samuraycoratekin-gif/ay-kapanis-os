@@ -264,7 +264,10 @@ const TL=n=>Number(n).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFra
 const params=new URLSearchParams(location.search);
 const CARI=params.get('cari')||'120.04';   // demo varsayilani: Demir Celik
 const MUSTERI=params.get('musteri')||'';   // hangi mukellef (motor:true firma) — bos ise backend varsayilani
-const MQ=MUSTERI?('&musteri='+encodeURIComponent(MUSTERI)):'';   // GET ekine
+const TOK=params.get('tok')||'';           // imzali portal erisimi (oturumsuz karsi taraf)
+// GET ekine: musteri + (varsa) tok&cari — token dogrulamasi cari+musteri ister
+const MQ=(MUSTERI?('&musteri='+encodeURIComponent(MUSTERI)):'')
+        +(TOK?('&tok='+encodeURIComponent(TOK)+'&cari='+encodeURIComponent(CARI)):'');
 let CARIADI=CARI, _secim=null, MAILAKTIF=false, _otpResolve=null, BIZIMBAK=0, FIRMAAD='ÖRNEK SANAYİ A.Ş.';
 
 const ORNEK={ '120.04':'120.04_Demir_Celik_ekstre.xlsx',
@@ -273,7 +276,7 @@ const ORNEK={ '120.04':'120.04_Demir_Celik_ekstre.xlsx',
 
 async function yukleForm(){
   try{
-    const d=await (await fetch('/api/form'+(MUSTERI?'?musteri='+encodeURIComponent(MUSTERI):''))).json();
+    const d=await (await fetch('/api/form?cari='+encodeURIComponent(CARI)+MQ)).json();
     if(d.firma){ FIRMAAD=d.firma;
       document.getElementById('gonderenAd').textContent=d.firma;
       document.getElementById('ackFirma').textContent=d.firma; }
@@ -293,7 +296,7 @@ async function yukleForm(){
     document.getElementById('formno').textContent=`Form No: MUT-${c.cari}-Mayis`;
     if(ORNEK[CARI]) document.getElementById('ornekipucu').innerHTML=
       `Demo için örnek ekstre: <b>ornek_ekstreler/${ORNEK[CARI]}</b>`;
-    try{ const md=await (await fetch('/api/maildurum'+(MUSTERI?'?musteri='+encodeURIComponent(MUSTERI):''))).json(); MAILAKTIF=!!md.aktif; }catch(e){}
+    try{ const md=await (await fetch('/api/maildurum?cari='+encodeURIComponent(CARI)+MQ)).json(); MAILAKTIF=!!md.aktif; }catch(e){}
   }catch(e){ document.getElementById('sayin').textContent='Sunucuya bağlanılamadı (app.py çalışıyor mu?).'; }
 }
 
@@ -307,7 +310,7 @@ async function otpAkis(){
   document.getElementById('otpInput').focus();
   let r;
   try{ r=await (await fetch('/api/otp_iste',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({cari:CARI,musteri:MUSTERI})})).json(); }
+    body:JSON.stringify({cari:CARI,musteri:MUSTERI,tok:TOK})})).json(); }
   catch(e){ document.getElementById('otpMesaj').textContent='Kod gönderilemedi (sunucu).'; }
   if(r){
     if(r.kanal==='demo' && r.demo_kod){
@@ -352,7 +355,7 @@ async function yanitGonderOTP(govde){
     }
     let r;
     try{ r=await (await fetch('/api/yanit',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({...govde, otp, musteri:MUSTERI})})).json(); }
+      body:JSON.stringify({...govde, otp, musteri:MUSTERI, tok:TOK})})).json(); }
     catch(e){ return {hata:'Sunucu hatası'}; }
     if(r && r.ok) return r;
     // Backend OTP istiyorsa (mail acik) MAILAKTIF bayragi ne olursa olsun kodu iste ve tekrar dene.

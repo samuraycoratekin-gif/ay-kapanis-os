@@ -11,16 +11,27 @@ def _b(tutar, gun, ack=""):
 
 
 class TestBirebirEsleme(unittest.TestCase):
+    # Isaret kurali (banka_oku): + = hesaba giren, HER IKI kaynakta da.
+    # Tahsilat bankada da defterde de + gorunur; eslesme ayni yonde aranir.
     def test_ayni_gun_tutar_eslesir(self):
         banka = [_b(150_000, 3, "TAHSILAT")]
-        defter = [_b(-150_000, 3, "TAHSILAT")]
+        defter = [_b(150_000, 3, "TAHSILAT")]
         r = ba.esle(banka, defter)
         self.assertEqual(r["eslesen"], 1)
         self.assertEqual(r["sorunlu"], 0)
 
     def test_gun_tolerans_disinda_eslesmez(self):
         banka = [_b(150_000, 3, "TAHSILAT")]
-        defter = [_b(-150_000, 20, "TAHSILAT")]   # 17 gun fark > GUN_TOL(3)
+        defter = [_b(150_000, 20, "TAHSILAT")]   # 17 gun fark > GUN_TOL(3)
+        r = ba.esle(banka, defter)
+        self.assertEqual(r["eslesen"], 0)
+        self.assertEqual(r["sorunlu"], 2)
+
+    def test_zit_yon_eslesmez(self):
+        # +500 giris ile -500 cikis ayni gun bile olsa BIRBIRINI KAPATAMAZ;
+        # aksi halde iki gercek hata maskelenirdi.
+        banka = [_b(500, 3, "GELEN HAVALE")]
+        defter = [_b(-500, 3, "GIDEN ODEME")]
         r = ba.esle(banka, defter)
         self.assertEqual(r["eslesen"], 0)
         self.assertEqual(r["sorunlu"], 2)
@@ -44,7 +55,7 @@ class TestKomisyonVeFazla(unittest.TestCase):
             _b(-250, 5, "HAVALE KOMISYONU"),       # komisyon, defterde yok
         ]
         defter = [
-            _b(-150_000, 3, "TAHSILAT"),           # eslesir
+            _b(150_000, 3, "TAHSILAT"),            # eslesir (ayni yon: giren)
             _b(-12_000, 26, "KASA DEVIR"),         # defter fazla
         ]
         r = ba.esle(banka, defter)

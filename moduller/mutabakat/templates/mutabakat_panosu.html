@@ -34,6 +34,14 @@
   .mb.akt{background:var(--mavi);color:#06101f}
   .mb.kilit{opacity:.45;cursor:not-allowed}
   .mb.kilit:hover{color:var(--soluk)}
+  /* Mail ayarlari dugmesi: .mb DEGIL (modbar tiklama isleyicisi mod degistirmesin) */
+  .mbayar{margin-left:auto;background:var(--yuzey2);border:1px solid var(--cizgi);color:var(--metin);
+    padding:9px 16px;border-radius:8px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+  .mbayar:hover{border-color:var(--mavi)}
+  .maLbl{display:block;font-size:12.5px;font-weight:700;color:var(--soluk)}
+  .maIn{display:block;width:100%;margin-top:5px;background:var(--bg);border:1px solid var(--cizgi);
+    border-radius:9px;color:var(--metin);padding:10px 12px;font:inherit;font-size:13.5px}
+  .maIn:focus{outline:none;border-color:var(--mavi)}
 
   .kpi{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:22px}
   @media(max-width:920px){.kpi{grid-template-columns:repeat(3,1fr)}}
@@ -165,6 +173,7 @@
   <div class="modbar">
     <button class="mb akt" data-m="on">1️⃣ İlk Gönderim (gönderim öncesi)</button>
     <button class="mb kilit" id="mbGuncel" data-m="guncel">🔒 Güncel Durum (yanıtlar geldi)</button>
+    <button class="mbayar" id="mbMail" onclick="mailAyarAc()" title="Gönderen mail / uygulama şifresi / portal adresi">✉️ Mail Ayarları</button>
   </div>
 
   <div class="kpi" id="kpi"></div>
@@ -187,6 +196,36 @@
     <div class="mbas" id="mbas"></div>
     <div class="meksik" id="meksik"></div>
     <div class="mnot" id="mnot"></div>
+  </div>
+</div>
+
+<!-- Mail & Portal ayarlari: SMTP gonderen + uygulama sifresi + portal koku.
+     Sifre sunucuda saklanir, buraya asla geri gelmez (yalniz "kayitli" rozeti). -->
+<div class="modalbg" id="mailAyarBg" onclick="if(event.target===this)mailAyarKapat()">
+  <div class="modal" style="max-width:560px">
+    <button class="mkapat" onclick="mailAyarKapat()">✕</button>
+    <div class="mbas"><h2>✉️ Mail &amp; Portal Ayarları</h2>
+      <div class="msub">Mutabakat formları bu hesaptan gönderilir. Şifre alanını boş bırakırsanız
+        kayıtlı şifre korunur; mail tamamen kapatmak için "şifreyi sil"i işaretleyin.</div></div>
+    <div style="display:grid;gap:12px">
+      <label class="maLbl">Gönderen adı (mailin "Kimden" kısmı)
+        <input id="maGonderen" class="maIn" placeholder="Örn. Altınok Mali Müşavirlik"></label>
+      <label class="maLbl">Gmail adresi (SMTP kullanıcı)
+        <input id="maUser" class="maIn" placeholder="ornek@gmail.com"></label>
+      <label class="maLbl">Gmail uygulama şifresi <span id="maSifreDurum" style="font-weight:400"></span>
+        <input id="maSifre" class="maIn" type="password" placeholder="boş = kayıtlı şifre korunur"></label>
+      <label class="maLbl" style="display:flex;align-items:center;gap:8px;font-weight:400">
+        <input type="checkbox" id="maSifreSil" style="width:15px;height:15px"> Kayıtlı şifreyi sil (mail gönderimini kapat)</label>
+      <label class="maLbl">Varsayılan karşı taraf e-postası (cariye özel mail yoksa)
+        <input id="maKarsi" class="maIn" placeholder="karsi@firma.com"></label>
+      <label class="maLbl">Portal adresi — boş bırakılırsa otomatik: <span id="maPortalEf" style="font-weight:400"></span>
+        <input id="maPortal" class="maIn" placeholder="https://uygulama-adresiniz/mutabakat"></label>
+      <div id="maMesaj" style="font-size:12.5px;color:var(--soluk)"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">
+        <button class="mbayar" style="margin-left:0" onclick="mailTest()" id="maTestBtn">📨 Test maili gönder</button>
+        <button class="mb akt" style="cursor:pointer" onclick="mailAyarKaydet()">💾 Kaydet</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -607,6 +646,63 @@ document.querySelector(".modbar").addEventListener("click",e=>{
   document.querySelectorAll(".mb").forEach(x=>x.classList.toggle("akt",x===b));
   tumCiz();
 });
+
+// ── Mail & Portal ayarlari ──────────────────────────────────────────────
+async function mailAyarAc(){
+  const bg=document.getElementById("mailAyarBg"); bg.classList.add("acik");
+  const msj=document.getElementById("maMesaj"); msj.textContent="Yükleniyor…";
+  try{
+    const d=await (await fetch("/api/mailayar")).json();
+    document.getElementById("maGonderen").value=d.gonderici_ad||"";
+    document.getElementById("maUser").value=d.smtp_user||"";
+    document.getElementById("maKarsi").value=d.varsayilan_karsi||"";
+    document.getElementById("maPortal").value=d.portal_url||"";
+    document.getElementById("maPortalEf").textContent=d.portal_efektif||"";
+    document.getElementById("maSifre").value="";
+    document.getElementById("maSifreSil").checked=false;
+    document.getElementById("maSifreDurum").innerHTML=d.app_sifre_kayitli
+      ?'<span style="color:#6ee7b7">(kayıtlı ✓ — mail AÇIK)</span>'
+      :'<span style="color:#fda4af">(kayıtlı değil — mail KAPALI / demo modu)</span>';
+    msj.textContent="";
+  }catch(e){ msj.textContent="Ayarlar okunamadı: "+e; }
+}
+function mailAyarKapat(){ document.getElementById("mailAyarBg").classList.remove("acik"); }
+async function mailAyarKaydet(){
+  const msj=document.getElementById("maMesaj"); msj.textContent="Kaydediliyor…";
+  const govde={
+    gonderici_ad:document.getElementById("maGonderen").value.trim(),
+    smtp_user:document.getElementById("maUser").value.trim(),
+    varsayilan_karsi:document.getElementById("maKarsi").value.trim(),
+    portal_url:document.getElementById("maPortal").value.trim(),
+  };
+  const sif=document.getElementById("maSifre").value.trim();
+  if(sif) govde.smtp_app_sifre=sif;
+  if(document.getElementById("maSifreSil").checked) govde.sifre_sil=true;
+  try{
+    const d=await (await fetch("/api/mailayar",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify(govde)})).json();
+    if(d.ok){
+      msj.innerHTML='<span style="color:#6ee7b7">Kaydedildi.</span> Mail durumu: '+
+        (d.mail_aktif?'<b style="color:#6ee7b7">AÇIK</b>':'<b style="color:#fda4af">KAPALI (demo)</b>');
+      document.getElementById("maSifre").value="";
+      document.getElementById("maSifreDurum").innerHTML=d.app_sifre_kayitli
+        ?'<span style="color:#6ee7b7">(kayıtlı ✓ — mail AÇIK)</span>'
+        :'<span style="color:#fda4af">(kayıtlı değil — mail KAPALI / demo modu)</span>';
+      document.getElementById("maPortalEf").textContent=d.portal_efektif||"";
+    } else msj.textContent="Kaydedilemedi: "+(d.hata||"bilinmeyen hata");
+  }catch(e){ msj.textContent="Sunucu hatası: "+e; }
+}
+async function mailTest(){
+  const msj=document.getElementById("maMesaj"); msj.textContent="Test maili gönderiliyor…";
+  const alici=document.getElementById("maKarsi").value.trim();
+  try{
+    const d=await (await fetch("/api/mailtest",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify(alici?{alici}:{})})).json();
+    msj.innerHTML=d.ok
+      ?'<span style="color:#6ee7b7">Test maili gönderildi → '+(d.alici||"")+'</span>'
+      :'<span style="color:#fda4af">Gönderilemedi: '+(d.hata||(d.mail_aktif?"":"önce uygulama şifresini kaydedin"))+'</span>';
+  }catch(e){ msj.textContent="Sunucu hatası: "+e; }
+}
 // ── Mukellefe ozel cari uretimi ──────────────────────────────────────────
 // Ofis panosundan bir mukellef secilince o mukellefin m/i/b sayilarina
 // birebir uyan, FARKLI cariler uretilir. Kod tohum (seed) olarak kullanildigi

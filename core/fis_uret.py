@@ -12,6 +12,7 @@ Fis semasi:
    "borc_toplam","alacak_toplam","denk": bool}
 """
 
+import hashlib
 from datetime import datetime
 
 TOL = 0.01
@@ -34,19 +35,16 @@ def _fis(anahtar, tip, baslik, tarih, aciklama, satirlar):
 # KDV mahsup fisi (mizandan)
 # --------------------------------------------------------------------------- #
 def kdv_mahsup_fisi(mizan, tarih):
+    from core import kdv_analiz
     h = mizan["hesaplar"]
 
     def bak(ana):
         o = h.get(ana)
         return abs(o["toplam"]) if o else 0.0
 
-    def acl(ana):
-        o = h.get(ana)
-        return abs(o.get("acilis", 0.0)) if o else 0.0
-
     b391 = bak("391")   # hesaplanan (alacak bakiye)
     b191 = bak("191")   # indirilecek (borc bakiye)
-    b190 = acl("190")   # onceki donemden devreden
+    b190 = kdv_analiz.devreden_onceki_190(mizan)   # gecen ay sonu devri (acilis degil)
     if b391 <= TOL and b191 <= TOL:
         return None
 
@@ -74,15 +72,24 @@ def kdv_mahsup_fisi(mizan, tarih):
 # --------------------------------------------------------------------------- #
 def banka_komisyon_fisleri(komisyon_hareketleri):
     fisler = []
-    for i, h in enumerate(komisyon_hareketleri):
+    gorulen = set()
+    for h in komisyon_hareketleri:
         tutar = round(abs(h["tutar"]), 2)
         if tutar <= TOL:
             continue
+        # Anahtar icerikten turetilir (tarih+tutar+aciklama): dosya yeniden
+        # yuklendiginde sira degisse bile onay durumu DOGRU fise yapisik kalir.
+        kimlik = hashlib.sha1(
+            f"{h.get('tarih','')}|{tutar}|{h.get('aciklama','')}".encode("utf-8")).hexdigest()[:10]
+        if kimlik in gorulen:            # birebir ayni hareket (cift satir) -> tek fis
+            kimlik = hashlib.sha1(
+                f"{kimlik}|{len(gorulen)}".encode("utf-8")).hexdigest()[:10]
+        gorulen.add(kimlik)
         satirlar = [
             {"hesap": "770", "ad": "Genel Yönetim Gideri (banka masrafı)", "borc": tutar, "alacak": 0.0},
             {"hesap": "102", "ad": "Bankalar", "borc": 0.0, "alacak": tutar},
         ]
-        fisler.append(_fis(f"banka_komisyon_{i}", "banka_komisyon",
+        fisler.append(_fis(f"banka_komisyon_{kimlik}", "banka_komisyon",
                            f"Banka Masraf Fişi — {h.get('aciklama','') or 'komisyon'}",
                            str(h.get("tarih", "")),
                            h.get("aciklama", "") or "Banka komisyon/masraf gideri.", satirlar))

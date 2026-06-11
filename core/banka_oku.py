@@ -49,6 +49,13 @@ def _hucre(r, j):
 def _tarih(v):
     if isinstance(v, (datetime, date)):
         return v
+    # Metin tarihleri date'e cevir ("15.05.2026", "2026-05-15"...). Cevrilemezse
+    # ham metni birak — ama o zaman gun toleransi uygulanamayacagindan eslesme
+    # salt tutara kalir; bu yuzden cevirmeyi elimizden geldigince deneriz.
+    from core.varlik_oku import _tarihe
+    d = _tarihe(v)
+    if d is not None:
+        return d
     return str(v).strip() if v not in (None, "") else ""
 
 

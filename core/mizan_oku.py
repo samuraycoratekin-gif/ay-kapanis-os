@@ -38,8 +38,11 @@ def _ham_satirlar(yol):
     if ext in (".xlsx", ".xlsm"):
         from openpyxl import load_workbook
         wb = load_workbook(yol, read_only=True, data_only=True)
-        ws = _sayfa_sec_openpyxl(wb)
-        return [list(r) for r in ws.iter_rows(values_only=True)]
+        try:
+            ws = _sayfa_sec_openpyxl(wb)
+            return [list(r) for r in ws.iter_rows(values_only=True)]
+        finally:
+            wb.close()   # read_only kip dosya tutamacini acik birakir (Win kilidi)
     elif ext == ".xls":
         import xlrd
         wb = xlrd.open_workbook(yol)
@@ -126,9 +129,8 @@ def oku(yol):
     aylar = [a for (a, _) in h["aylar"]]
     kumule_format = bool(h["aylar"]) or h["toplam"] is not None
 
-    hesaplar = {}   # ana_kod -> ozet
-    satir_sayisi = 0
-
+    # --- 1. gecis: satirlari ayristir (henuz toplama yok) -------------------
+    parsed = []
     for r in satirlar[hi + 1:]:
         kod = r[h["kod"]] if h["kod"] < len(r) else None
         if kod in (None, ""):
@@ -167,9 +169,20 @@ def oku(yol):
             toplam = (bb or 0) - (ab or 0)
             acilis, aylik = None, {}
 
-        if toplam is None:
-            toplam = 0.0
+        parsed.append({"kod": kod, "ad": ad, "ana": ana, "ana_ad": ana_ad,
+                       "toplam": 0.0 if toplam is None else toplam,
+                       "acilis": acilis, "aylik": aylik})
 
+    # Hem 3 haneli GRUP satiri (kod == ana, or. "770") hem detaylari ("770.01")
+    # olan mizanlarda grup satiri TOPLAMA katilmaz (cift sayim onlenir);
+    # yalnizca grup ADI icin kullanilir.
+    detayli_analar = {p["ana"] for p in parsed if p["kod"] != p["ana"]}
+
+    # --- 2. gecis: ana hesap bazinda topla ---------------------------------
+    hesaplar = {}   # ana_kod -> ozet
+    satir_sayisi = 0
+    for p in parsed:
+        ana, kod, ad, ana_ad = p["ana"], p["kod"], p["ad"], p["ana_ad"]
         o = hesaplar.setdefault(ana, {"ana": ana, "ad": ana_ad,
                                       "toplam": 0.0, "acilis": 0.0,
                                       "aylik": {a: 0.0 for a in aylar},
@@ -182,10 +195,12 @@ def oku(yol):
             o["ad"] = ad
         elif not o["ad"] and ad:
             o["ad"] = ad
-        o["toplam"] += toplam
-        o["acilis"] += (acilis or 0)
+        if kod == ana and ana in detayli_analar:
+            continue                     # ozet satiri: tutarlari detaylar tasiyor
+        o["toplam"] += p["toplam"]
+        o["acilis"] += (p["acilis"] or 0)
         for a in aylar:
-            o["aylik"][a] += (aylik.get(a) or 0)
+            o["aylik"][a] += (p["aylik"].get(a) or 0)
         o["detay_sayisi"] += 1
         satir_sayisi += 1
 
