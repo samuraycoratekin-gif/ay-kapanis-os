@@ -159,7 +159,7 @@
         const tr = document.createElement('tr');
         const tipB = k.tip === 'sirket' ? 'b-sirket' : 'b-ofis';
         const durB = k.aktif ? 'b-aktif' : 'b-pasif';
-        const durMetin = k.aktif ? 'Aktif' : 'Pasif';
+        const durMetin = k.aktif ? 'Aktif' : 'Arşivde (pasif)';
         const sahip = new Set(k.moduller || []);
         // Her modul icin tiklanabilir rozet: acik=sari, kapali=gri. Tiklayinca toggle.
         const modPills = Object.entries(MODUL_AD).map(([kod, ad]) => {
@@ -167,9 +167,11 @@
           return `<span class="badge b-mod${acik ? '' : ' kapali'}" title="${acik ? 'Açık — kapatmak için tıkla' : 'Kapalı — açmak için tıkla'}"
             onclick="modulToggle('${k.id}','${kod}',${acik})">${acik ? '✓ ' : ''}${esc(ad)}</span>`;
         }).join('');
+        // Dugme etiketi YAPILACAK ISLEMI soyler (durum rozetiyle karismasin):
+        // aktif kiracida "Arsivle", arsivdekinde "Aktiflestir".
         const toggle = k.aktif
-          ? `<button class="btn btn-sm btn-warn" title="Arşivle: giriş kapanır, veri korunur" onclick="durum('${k.id}',false)"><i class="fa-solid fa-pause"></i> Pasif</button>`
-          : `<button class="btn btn-sm btn-ok" onclick="durum('${k.id}',true)"><i class="fa-solid fa-play"></i> Aktif</button>`;
+          ? `<button class="btn btn-sm btn-warn" title="Arşivle: giriş kapanır, veri korunur" onclick="durum('${k.id}',false)"><i class="fa-solid fa-box-archive"></i> Arşivle</button>`
+          : `<button class="btn btn-sm btn-ok" title="Arşivden çıkar: giriş yeniden açılır" onclick="durum('${k.id}',true)"><i class="fa-solid fa-rotate-left"></i> Aktifleştir</button>`;
         // Kalici silme yalniz PASIF (arsiv) kiracida sunulur; varsayilan korunur.
         const sil = (!k.aktif && k.id !== 'varsayilan')
           ? `<button class="btn btn-sm btn-danger" title="KALICI sil — kiracının tüm verisi geri dönüşsüz silinir" onclick="kiraciSil('${k.id}','${esc(k.unvan)}')"><i class="fa-solid fa-trash"></i> Sil</button>`
@@ -240,7 +242,7 @@
       const r = await fetch('/api/kiraci_durum', { method:'POST',
         headers:{'Content-Type':'application/json'}, body: JSON.stringify({id, aktif}) });
       const d = await r.json();
-      if (d.ok) { durumYaz('liste-durum', aktif ? 'Kiracı aktifleştirildi.' : 'Kiracı pasif yapıldı.', true); yukle(); }
+      if (d.ok) { durumYaz('liste-durum', aktif ? 'Kiracı arşivden çıkarıldı (aktif).' : 'Kiracı arşive alındı — satırında artık Sil düğmesi var.', true); yukle(); }
       else { durumYaz('liste-durum', d.hata || 'Hata.', false); }
     }
 
