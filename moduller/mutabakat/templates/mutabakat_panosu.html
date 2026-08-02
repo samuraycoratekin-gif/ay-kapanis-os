@@ -806,7 +806,10 @@ async function motoraBagla(musteri){
     const mmap=(md&&md.cariler)||{}, mvar=(md&&md.varsayilan_karsi)||"";
     VERI = tr.cariler.map(c=>({
       kod:c.cari, firma:c.adi, bizim:c.bizim_bakiye, karsi:c.karsi_bakiye,
-      durum:(c.durum==="MUTABIK"?"MUTABIK":"ITIRAZLI"),  // AKSIYON = fark var → ITIRAZLI
+      // Rozet motor farkindan DEGIL, yasam dongusunden gelir: karsi taraf portaldan
+      // yanit verene kadar BEKLIYOR; itiraz -> ITIRAZLI, kabul -> MUTABIK.
+      durum:(c.yasam_durum==="ITIRAZLI"?"ITIRAZLI":(c.yasam_durum==="MUTABIK"?"MUTABIK":"BEKLIYOR")),
+      motor_durum:c.durum,  // fark analizi icin motor sonucu ayri tutulur
       yanit:null, kanal:null, tur:1, mail:(mmap[c.cari]||mvar)  // ERP/cari_mailler'dan cozulen adres (yoksa varsayilan)
     }));
     MOTOR_BAGLI=true;

@@ -276,11 +276,23 @@ def _durum_ham():
 
 
 def _eski_format_mi(ham):
+    # Eski (duz) format: ust seviyede cari kodlari + GKEY. Yeni format: ust seviyede
+    # mukellef kodlari (her biri kendi cari haritasini tutar).
     if not ham:
         return False
     if GKEY in ham:
         return True
-    return not all(str(k).startswith("MUK-") for k in ham)
+    # Yeni format tespiti mukellef koduna dayanir — "MUK-" onekine DEGIL. Boylece
+    # OPT-SGK gibi ozel kodlu kiracilar da dogru saklanir (aksi halde her yazimda
+    # bir kat daha ic ice gecip durum deposu bozulur).
+    try:
+        kodlar = {m.get("kod") for m in mukellef_listesi()}
+    except Exception:
+        kodlar = set()
+    if kodlar and any(k in kodlar for k in ham):
+        return False
+    # Mukellef koduyla eslesmedi: cari kodlari nokta icerir -> duz/eski format.
+    return True
 
 
 def _durum_tum():
@@ -729,13 +741,19 @@ def asama_eslestir():
 def asama_triyaj():
     s = G.kontrol(aktif_yol("bizim"), aktif_yol("karsi"), aktif_yol("gib"))
     analiz = D.cari_analiz(aktif_yol("bizim"), aktif_yol("karsi"))
+    yasam = durum_yukle()   # saklanan yasam dongusu (portal yaniti): BEKLIYOR/GONDERILDI/MUTABIK/ITIRAZLI
     cariler, mutabik = [], 0
     for ck, d in s.items():
         durum = "MUTABIK" if not d["bulgular"] else "AKSIYON"
         if durum == "MUTABIK":
             mutabik += 1
         a = analiz.get(ck, {})
+        y = yasam.get(ck, {}) if isinstance(yasam.get(ck), dict) else {}
         cariler.append({"cari": ck, "adi": d["adi"], "durum": durum,
+                        # motor farki (durum) SADECE fark analizi icindir; panoda gosterilen
+                        # rozet yasam_durum'dan gelir: karsi taraf yanitlayana kadar BEKLIYOR.
+                        "yasam_durum": y.get("durum") or "BEKLIYOR",
+                        "gonderim": y.get("gonderim", 0),
                         "bizim_bakiye": a.get("bizim_bakiye", 0),
                         "karsi_bakiye": a.get("karsi_bakiye", 0),
                         "fark_sayisi": len(d["bulgular"])})
