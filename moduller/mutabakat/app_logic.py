@@ -376,7 +376,8 @@ def mail_ayar():
 
 def mail_aktif_mi():
     a = mail_ayar()
-    return (bool((a.get("smtp_app_sifre") or "").strip()) or
+    return (bool(_gmail_token()) or
+            bool((a.get("smtp_app_sifre") or "").strip()) or
             bool((a.get("resend_api_key") or "").strip()))
 
 
@@ -402,11 +403,92 @@ def _resend_gonder(alici, konu, html, gonderen, api_key):
         return False, str(e), ""
 
 
+def _gmail_token():
+    """Gmail OAuth token'i: once env (Railway), sonra ayar dosyasi (pano alani).
+    Gecerli sayilmasi icin refresh_token + client_id + client_secret sart."""
+    raw = (os.environ.get("GOOGLE_ACCOUNT1_TOKEN_JSON")
+           or os.environ.get("GMAIL_TOKEN_JSON") or "").strip()
+    if not raw:
+        raw = (mail_ayar().get("gmail_token_json") or "").strip()
+    if not raw:
+        return None
+    try:
+        tok = json.loads(raw)
+    except Exception:
+        return None
+    if tok.get("refresh_token") and tok.get("client_id") and tok.get("client_secret"):
+        return tok
+    return None
+
+
+def _gmail_access_token(tok):
+    """refresh_token ile taze access_token al (stdlib urllib)."""
+    import urllib.request as _ur, urllib.parse as _up
+    data = _up.urlencode({
+        "client_id": tok.get("client_id", ""),
+        "client_secret": tok.get("client_secret", ""),
+        "refresh_token": tok.get("refresh_token", ""),
+        "grant_type": "refresh_token",
+    }).encode("utf-8")
+    req = _ur.Request(tok.get("token_uri") or "https://oauth2.googleapis.com/token",
+                      data=data, method="POST")
+    with _ur.urlopen(req, timeout=20) as r:
+        return json.loads(r.read()).get("access_token", "")
+
+
+def _gmail_api_gonder(alici, konu, html, gonderen, tok):
+    """Gmail API users.messages.send — HTTPS/443, Railway SMTP blokundan bagimsiz.
+    Mail, token'in ait oldugu gercek Gmail hesabindan cikar."""
+    import urllib.request as _ur, urllib.error as _ue
+    try:
+        access = _gmail_access_token(tok)
+    except _ue.HTTPError as e:
+        return False, f"Gmail token {e.code}: {e.read().decode(errors='ignore')}", ""
+    except Exception as e:
+        return False, f"Gmail token hatasi: {e}", ""
+    if not access:
+        return False, "Gmail access_token bos dondu (refresh_token gecerli mi?)", ""
+
+    msg = EmailMessage()
+    msg["From"] = gonderen
+    msg["To"] = alici
+    msg["Subject"] = konu
+    msg.set_content("Bu e-posta HTML formatindadir.")
+    msg.add_alternative(html, subtype="html")
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("ascii")
+
+    payload = json.dumps({"raw": raw}).encode("utf-8")
+    req = _ur.Request(
+        "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        data=payload,
+        headers={"Authorization": f"Bearer {access}",
+                 "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with _ur.urlopen(req, timeout=20) as r:
+            body = json.loads(r.read())
+            return True, "", body.get("id", "")
+    except _ue.HTTPError as e:
+        return False, f"Gmail {e.code}: {e.read().decode(errors='ignore')}", ""
+    except Exception as e:
+        return False, str(e), ""
+
+
 def mail_gonder(alici, konu, html, metin=""):
     a = mail_ayar()
     cfg = _json_oku(CARI_MAIL(), {})
     gad = cfg.get("_gonderici_ad") or aktif_unvan()
     mid = make_msgid(domain="mutabakat.local")
+
+    # 1) Gmail API (tercih) — Railway'de calisir, gercek Gmail hesabindan gonderir
+    tok = _gmail_token()
+    if tok:
+        gfrom = (a.get("gmail_from") or "").strip()
+        user = (a.get("smtp_user") or kiraci_mail()).strip()
+        gonderen = gfrom or f"{gad} <{user}>"
+        ok, hata, rid = _gmail_api_gonder(alici, konu, html, gonderen, tok)
+        return ok, hata, rid or mid
 
     resend_key = (a.get("resend_api_key") or "").strip()
     if resend_key:
@@ -1141,6 +1223,10 @@ def api_mailayar_oku():
             "app_sifre_kayitli": bool((a.get("smtp_app_sifre") or "").strip()),
             "resend_key_kayitli": bool((a.get("resend_api_key") or "").strip()),
             "resend_from": (a.get("resend_from") or "").strip(),
+            "gmail_kayitli": bool(_gmail_token()),
+            "gmail_env": bool((os.environ.get("GOOGLE_ACCOUNT1_TOKEN_JSON")
+                               or os.environ.get("GMAIL_TOKEN_JSON") or "").strip()),
+            "gmail_from": (a.get("gmail_from") or "").strip(),
             "portal_url": (a.get("portal_url") or "").strip(),
             "portal_efektif": PORTAL_URL(),
             "gonderici_ad": cfg.get("_gonderici_ad", "") or aktif_unvan(),
@@ -1154,6 +1240,7 @@ def api_mailayar_yaz(body, ip="", ua=""):
     Sifre/anahtar alanlari yalniz doluysa guncellenir (bos = mevcut korunur)."""
     sifre = (body.get("smtp_app_sifre") or "").strip()
     resend_key = (body.get("resend_api_key") or "").strip()
+    gmail_token = (body.get("gmail_token_json") or "").strip()
     with _YAZ_KILIT:
         a = mail_ayar()
         if "smtp_user" in body:
@@ -1168,6 +1255,12 @@ def api_mailayar_yaz(body, ip="", ua=""):
             a["resend_api_key"] = ""
         if "resend_from" in body:
             a["resend_from"] = (body.get("resend_from") or "").strip()
+        if gmail_token:
+            a["gmail_token_json"] = gmail_token
+        if body.get("gmail_token_sil"):
+            a["gmail_token_json"] = ""
+        if "gmail_from" in body:
+            a["gmail_from"] = (body.get("gmail_from") or "").strip()
         if "portal_url" in body:
             a["portal_url"] = (body.get("portal_url") or "").strip()
         _json_yaz(MAIL_AYAR(), a)
@@ -1190,11 +1283,14 @@ def api_mailayar_yaz(body, ip="", ua=""):
         _json_yaz(CARI_MAIL(), cfg)
     degisen = [k for k in ("smtp_user", "portal_url", "gonderici_ad",
                            "varsayilan_karsi", "cariler", "sifre_sil",
-                           "resend_from", "resend_key_sil") if k in body]
+                           "resend_from", "resend_key_sil",
+                           "gmail_from", "gmail_token_sil") if k in body]
     if sifre:
         degisen.append("smtp_app_sifre(guncellendi)")
     if resend_key:
         degisen.append("resend_api_key(guncellendi)")
+    if gmail_token:
+        degisen.append("gmail_token_json(guncellendi)")
     kanit_yaz({"olay": "MAIL_AYAR_GUNCELLENDI", "alanlar": degisen, "ip": ip, "tarayici": ua})
     return api_mailayar_oku()
 

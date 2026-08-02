@@ -217,7 +217,15 @@
       <label class="maLbl" style="display:flex;align-items:center;gap:8px;font-weight:400">
         <input type="checkbox" id="maSifreSil" style="width:15px;height:15px"> Kayıtlı şifreyi sil (mail gönderimini kapat)</label>
       <hr style="border:none;border-top:1px solid rgba(255,255,255,.12);margin:4px 0">
-      <div style="font-size:11.5px;color:var(--soluk)"><b>🔁 Resend API</b> — Railway/bulut için önerilen yöntem (SMTP port sorunu yaşanmaz)</div>
+      <div style="font-size:11.5px;color:var(--soluk)"><b>🟢 Gmail API (OAuth)</b> — Railway'de çalışır, mail <b>gerçekten kendi Gmail'inizden</b> gider. Token bir kez oluşturulur, buraya yapıştırılır. <span id="maGmailEnv" style="font-weight:400"></span></div>
+      <label class="maLbl">Gmail OAuth token JSON <span id="maGmailDurum" style="font-weight:400"></span>
+        <textarea id="maGmailToken" class="maIn" rows="3" placeholder='{"refresh_token":"...","client_id":"...","client_secret":"..."}  (boş = kayıtlı korunur)' style="font-family:monospace;font-size:11px;resize:vertical"></textarea></label>
+      <label class="maLbl" style="display:flex;align-items:center;gap:8px;font-weight:400">
+        <input type="checkbox" id="maGmailSil" style="width:15px;height:15px"> Gmail token'ını sil</label>
+      <label class="maLbl">Gönderen adresi (Gmail) — token'ın ait olduğu adres
+        <input id="maGmailFrom" class="maIn" placeholder="Mutabakat &lt;samuraycoratekin@gmail.com&gt;"></label>
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,.12);margin:4px 0">
+      <div style="font-size:11.5px;color:var(--soluk)"><b>🔁 Resend API</b> — alternatif bulut yöntemi (SMTP port sorunu yaşanmaz)</div>
       <label class="maLbl">Resend API anahtarı <span id="maResendDurum" style="font-weight:400"></span>
         <input id="maResendKey" class="maIn" type="password" placeholder="re_xxxxxxxxxx  (boş = kayıtlı korunur)"></label>
       <label class="maLbl" style="display:flex;align-items:center;gap:8px;font-weight:400">
@@ -676,8 +684,16 @@ async function mailAyarAc(){
     document.getElementById("maResendKeySil").checked=false;
     document.getElementById("maResendFrom").value=d.resend_from||"";
     document.getElementById("maResendDurum").innerHTML=d.resend_key_kayitli
+      ?'<span style="color:#6ee7b7">(kayıtlı ✓)</span>'
+      :'<span style="color:#fda4af">(kayıtlı değil)</span>';
+    document.getElementById("maGmailToken").value="";
+    document.getElementById("maGmailSil").checked=false;
+    document.getElementById("maGmailFrom").value=d.gmail_from||"";
+    document.getElementById("maGmailDurum").innerHTML=d.gmail_kayitli
       ?'<span style="color:#6ee7b7">(kayıtlı ✓ — AKTİF)</span>'
       :'<span style="color:#fda4af">(kayıtlı değil)</span>';
+    document.getElementById("maGmailEnv").innerHTML=d.gmail_env
+      ?'<span style="color:#6ee7b7">[Railway env ile geldi]</span>':'';
     msj.textContent="";
   }catch(e){ msj.textContent="Ayarlar okunamadı: "+e; }
 }
@@ -697,13 +713,18 @@ async function mailAyarKaydet(){
   if(rk) govde.resend_api_key=rk;
   if(document.getElementById("maResendKeySil").checked) govde.resend_key_sil=true;
   govde.resend_from=document.getElementById("maResendFrom").value.trim();
+  const gt=document.getElementById("maGmailToken").value.trim();
+  if(gt) govde.gmail_token_json=gt;
+  if(document.getElementById("maGmailSil").checked) govde.gmail_token_sil=true;
+  govde.gmail_from=document.getElementById("maGmailFrom").value.trim();
   try{
     const d=await (await fetch("/api/mailayar",{method:"POST",
       headers:{"Content-Type":"application/json"},body:JSON.stringify(govde)})).json();
     if(d.ok){
       msj.innerHTML='<span style="color:#6ee7b7">Kaydedildi.</span> Mail durumu: '+
         (d.mail_aktif?'<b style="color:#6ee7b7">AÇIK</b>':'<b style="color:#fda4af">KAPALI (demo)</b>')+
-        (d.resend_key_kayitli?' <span style="color:#6ee7b7;font-size:11px">[Resend ✓]</span>':
+        (d.gmail_kayitli?' <span style="color:#6ee7b7;font-size:11px">[Gmail API ✓]</span>':
+         d.resend_key_kayitli?' <span style="color:#6ee7b7;font-size:11px">[Resend ✓]</span>':
          d.app_sifre_kayitli?' <span style="color:#93c5fd;font-size:11px">[SMTP]</span>':'');
       document.getElementById("maSifre").value="";
       document.getElementById("maSifreDurum").innerHTML=d.app_sifre_kayitli
@@ -711,6 +732,10 @@ async function mailAyarKaydet(){
         :'<span style="color:#fda4af">(kayıtlı değil)</span>';
       document.getElementById("maResendKey").value="";
       document.getElementById("maResendDurum").innerHTML=d.resend_key_kayitli
+        ?'<span style="color:#6ee7b7">(kayıtlı ✓)</span>'
+        :'<span style="color:#fda4af">(kayıtlı değil)</span>';
+      document.getElementById("maGmailToken").value="";
+      document.getElementById("maGmailDurum").innerHTML=d.gmail_kayitli
         ?'<span style="color:#6ee7b7">(kayıtlı ✓ — AKTİF)</span>'
         :'<span style="color:#fda4af">(kayıtlı değil)</span>';
       document.getElementById("maPortalEf").textContent=d.portal_efektif||"";
