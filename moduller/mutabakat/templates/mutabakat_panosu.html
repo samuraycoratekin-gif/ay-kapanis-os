@@ -216,6 +216,15 @@
         <input id="maSifre" class="maIn" type="password" placeholder="boş = kayıtlı şifre korunur"></label>
       <label class="maLbl" style="display:flex;align-items:center;gap:8px;font-weight:400">
         <input type="checkbox" id="maSifreSil" style="width:15px;height:15px"> Kayıtlı şifreyi sil (mail gönderimini kapat)</label>
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,.12);margin:4px 0">
+      <div style="font-size:11.5px;color:var(--soluk)"><b>🔁 Resend API</b> — Railway/bulut için önerilen yöntem (SMTP port sorunu yaşanmaz)</div>
+      <label class="maLbl">Resend API anahtarı <span id="maResendDurum" style="font-weight:400"></span>
+        <input id="maResendKey" class="maIn" type="password" placeholder="re_xxxxxxxxxx  (boş = kayıtlı korunur)"></label>
+      <label class="maLbl" style="display:flex;align-items:center;gap:8px;font-weight:400">
+        <input type="checkbox" id="maResendKeySil" style="width:15px;height:15px"> Resend anahtarını sil</label>
+      <label class="maLbl">Gönderen adresi (Resend) — domaininizden doğrulanmış adres
+        <input id="maResendFrom" class="maIn" placeholder="Mutabakat &lt;noreply@azamol.ai&gt;"></label>
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,.12);margin:4px 0">
       <label class="maLbl">Varsayılan karşı taraf e-postası (cariye özel mail yoksa)
         <input id="maKarsi" class="maIn" placeholder="karsi@firma.com"></label>
       <label class="maLbl">Portal adresi — boş bırakılırsa otomatik: <span id="maPortalEf" style="font-weight:400"></span>
@@ -661,8 +670,14 @@ async function mailAyarAc(){
     document.getElementById("maSifre").value="";
     document.getElementById("maSifreSil").checked=false;
     document.getElementById("maSifreDurum").innerHTML=d.app_sifre_kayitli
-      ?'<span style="color:#6ee7b7">(kayıtlı ✓ — mail AÇIK)</span>'
-      :'<span style="color:#fda4af">(kayıtlı değil — mail KAPALI / demo modu)</span>';
+      ?'<span style="color:#6ee7b7">(kayıtlı ✓)</span>'
+      :'<span style="color:#fda4af">(kayıtlı değil)</span>';
+    document.getElementById("maResendKey").value="";
+    document.getElementById("maResendKeySil").checked=false;
+    document.getElementById("maResendFrom").value=d.resend_from||"";
+    document.getElementById("maResendDurum").innerHTML=d.resend_key_kayitli
+      ?'<span style="color:#6ee7b7">(kayıtlı ✓ — AKTİF)</span>'
+      :'<span style="color:#fda4af">(kayıtlı değil)</span>';
     msj.textContent="";
   }catch(e){ msj.textContent="Ayarlar okunamadı: "+e; }
 }
@@ -678,16 +693,26 @@ async function mailAyarKaydet(){
   const sif=document.getElementById("maSifre").value.trim();
   if(sif) govde.smtp_app_sifre=sif;
   if(document.getElementById("maSifreSil").checked) govde.sifre_sil=true;
+  const rk=document.getElementById("maResendKey").value.trim();
+  if(rk) govde.resend_api_key=rk;
+  if(document.getElementById("maResendKeySil").checked) govde.resend_key_sil=true;
+  govde.resend_from=document.getElementById("maResendFrom").value.trim();
   try{
     const d=await (await fetch("/api/mailayar",{method:"POST",
       headers:{"Content-Type":"application/json"},body:JSON.stringify(govde)})).json();
     if(d.ok){
       msj.innerHTML='<span style="color:#6ee7b7">Kaydedildi.</span> Mail durumu: '+
-        (d.mail_aktif?'<b style="color:#6ee7b7">AÇIK</b>':'<b style="color:#fda4af">KAPALI (demo)</b>');
+        (d.mail_aktif?'<b style="color:#6ee7b7">AÇIK</b>':'<b style="color:#fda4af">KAPALI (demo)</b>')+
+        (d.resend_key_kayitli?' <span style="color:#6ee7b7;font-size:11px">[Resend ✓]</span>':
+         d.app_sifre_kayitli?' <span style="color:#93c5fd;font-size:11px">[SMTP]</span>':'');
       document.getElementById("maSifre").value="";
       document.getElementById("maSifreDurum").innerHTML=d.app_sifre_kayitli
-        ?'<span style="color:#6ee7b7">(kayıtlı ✓ — mail AÇIK)</span>'
-        :'<span style="color:#fda4af">(kayıtlı değil — mail KAPALI / demo modu)</span>';
+        ?'<span style="color:#6ee7b7">(kayıtlı ✓)</span>'
+        :'<span style="color:#fda4af">(kayıtlı değil)</span>';
+      document.getElementById("maResendKey").value="";
+      document.getElementById("maResendDurum").innerHTML=d.resend_key_kayitli
+        ?'<span style="color:#6ee7b7">(kayıtlı ✓ — AKTİF)</span>'
+        :'<span style="color:#fda4af">(kayıtlı değil)</span>';
       document.getElementById("maPortalEf").textContent=d.portal_efektif||"";
     } else msj.textContent="Kaydedilemedi: "+(d.hata||"bilinmeyen hata");
   }catch(e){ msj.textContent="Sunucu hatası: "+e; }

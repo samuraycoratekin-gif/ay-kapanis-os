@@ -375,19 +375,53 @@ def mail_ayar():
 
 
 def mail_aktif_mi():
-    return bool((mail_ayar().get("smtp_app_sifre") or "").strip())
+    a = mail_ayar()
+    return (bool((a.get("smtp_app_sifre") or "").strip()) or
+            bool((a.get("resend_api_key") or "").strip()))
+
+
+def _resend_gonder(alici, konu, html, gonderen, api_key):
+    """Resend HTTP API — Railway/cloud ortaminda SMTP port bloku yoktur."""
+    import urllib.request as _ur, urllib.error as _ue
+    payload = json.dumps(
+        {"from": gonderen, "to": [alici], "subject": konu, "html": html}
+    ).encode("utf-8")
+    req = _ur.Request(
+        "https://api.resend.com/emails", data=payload,
+        headers={"Authorization": f"Bearer {api_key}",
+                 "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with _ur.urlopen(req, timeout=20) as r:
+            body = json.loads(r.read())
+            return True, "", body.get("id", "")
+    except _ue.HTTPError as e:
+        return False, f"Resend {e.code}: {e.read().decode(errors='ignore')}", ""
+    except Exception as e:
+        return False, str(e), ""
 
 
 def mail_gonder(alici, konu, html, metin=""):
     a = mail_ayar()
-    sifre = (a.get("smtp_app_sifre") or "").strip().replace(" ", "")
-    user = (a.get("smtp_user") or kiraci_mail())   # ayarda yoksa kiraci giris e-postasi
-    if not sifre or not user or not alici:
-        return False, "yapilandirma eksik (app sifresi/alici)", ""
-    msg = EmailMessage()
     cfg = _json_oku(CARI_MAIL(), {})
     gad = cfg.get("_gonderici_ad") or aktif_unvan()
     mid = make_msgid(domain="mutabakat.local")
+
+    resend_key = (a.get("resend_api_key") or "").strip()
+    if resend_key:
+        resend_from = (a.get("resend_from") or "").strip()
+        user = (a.get("smtp_user") or kiraci_mail()).strip()
+        gonderen = resend_from or f"{gad} <{user}>"
+        ok, hata, rid = _resend_gonder(alici, konu, html, gonderen, resend_key)
+        return ok, hata, rid or mid
+
+    # SMTP fallback (lokal gelistirme; Railway'de port bloklu)
+    sifre = (a.get("smtp_app_sifre") or "").strip().replace(" ", "")
+    user = (a.get("smtp_user") or kiraci_mail())
+    if not sifre or not user or not alici:
+        return False, "yapilandirma eksik (app sifresi/alici)", ""
+    msg = EmailMessage()
     msg["Message-ID"] = mid
     msg["From"] = f"{gad} <{user}>"
     msg["To"] = alici
@@ -1105,6 +1139,8 @@ def api_mailayar_oku():
     return {"ok": True,
             "smtp_user": (a.get("smtp_user") or "").strip() or kiraci_mail(),
             "app_sifre_kayitli": bool((a.get("smtp_app_sifre") or "").strip()),
+            "resend_key_kayitli": bool((a.get("resend_api_key") or "").strip()),
+            "resend_from": (a.get("resend_from") or "").strip(),
             "portal_url": (a.get("portal_url") or "").strip(),
             "portal_efektif": PORTAL_URL(),
             "gonderici_ad": cfg.get("_gonderici_ad", "") or aktif_unvan(),
@@ -1114,10 +1150,10 @@ def api_mailayar_oku():
 
 
 def api_mailayar_yaz(body, ip="", ua=""):
-    """SMTP + portal + varsayilan karsi mail ayarlarini yazar.
-    App sifresi yalniz doluysa guncellenir (bos = mevcut korunur); yanitlarda
-    sifre asla geri donmez, kanita da yazilmaz."""
+    """SMTP / Resend + portal + varsayilan karsi mail ayarlarini yazar.
+    Sifre/anahtar alanlari yalniz doluysa guncellenir (bos = mevcut korunur)."""
     sifre = (body.get("smtp_app_sifre") or "").strip()
+    resend_key = (body.get("resend_api_key") or "").strip()
     with _YAZ_KILIT:
         a = mail_ayar()
         if "smtp_user" in body:
@@ -1126,6 +1162,12 @@ def api_mailayar_yaz(body, ip="", ua=""):
             a["smtp_app_sifre"] = sifre
         if body.get("sifre_sil"):
             a["smtp_app_sifre"] = ""
+        if resend_key:
+            a["resend_api_key"] = resend_key
+        if body.get("resend_key_sil"):
+            a["resend_api_key"] = ""
+        if "resend_from" in body:
+            a["resend_from"] = (body.get("resend_from") or "").strip()
         if "portal_url" in body:
             a["portal_url"] = (body.get("portal_url") or "").strip()
         _json_yaz(MAIL_AYAR(), a)
@@ -1147,9 +1189,12 @@ def api_mailayar_yaz(body, ip="", ua=""):
             cfg["cariler"] = mevcut
         _json_yaz(CARI_MAIL(), cfg)
     degisen = [k for k in ("smtp_user", "portal_url", "gonderici_ad",
-                           "varsayilan_karsi", "cariler", "sifre_sil") if k in body]
+                           "varsayilan_karsi", "cariler", "sifre_sil",
+                           "resend_from", "resend_key_sil") if k in body]
     if sifre:
         degisen.append("smtp_app_sifre(guncellendi)")
+    if resend_key:
+        degisen.append("resend_api_key(guncellendi)")
     kanit_yaz({"olay": "MAIL_AYAR_GUNCELLENDI", "alanlar": degisen, "ip": ip, "tarayici": ua})
     return api_mailayar_oku()
 
