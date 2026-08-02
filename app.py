@@ -1589,8 +1589,38 @@ def _varsayilan_kiraci_seed():
     depo._yaz(kiraci.KIRACILAR_JSON, kayitlar)
 
 
+def _optimed_kiraci_seed():
+    """Optimed demo kiracisini olusturur (idempotent: zaten varsa atlar).
+    Mutabakat modulu etkin; ornek Excel'ler tenant dizinine kopyalanir."""
+    if kiraci.kiraci_getir_eposta("demo@optimed.com.tr"):
+        return
+    try:
+        k = kiraci.kiraci_ekle(
+            unvan="Optimed Sağlık Grubu",
+            eposta="demo@optimed.com.tr",
+            parola="optimed1234",
+            tip="sirket",
+            paket="pilot",
+            moduller=["ay_kapanis", "mutabakat"],
+        )
+        kid = k["id"]
+        # Optimed ornek Excel'lerini tenant'in mutabakat/ornek dizinine kopyala
+        import shutil
+        burada = os.path.dirname(os.path.abspath(__file__))
+        kaynak = os.path.join(burada, "moduller", "mutabakat", "ornek_veri")
+        hedef  = os.path.join(depo.ROOT_VERI, "kiracilar", kid, "mutabakat", "ornek")
+        os.makedirs(hedef, exist_ok=True)
+        for dosya in ("optimed_logo.xlsx", "optimed_sgk.xlsx", "optimed_gib.xlsx"):
+            src = os.path.join(kaynak, dosya)
+            if os.path.exists(src):
+                shutil.copy2(src, os.path.join(hedef, dosya))
+    except Exception:
+        pass  # zaten varsa veya hata: sessizce gec
+
+
 def seed():
     _varsayilan_kiraci_seed()
+    _optimed_kiraci_seed()
     if not depo.kullanicilari_getir():
         depo.kullanici_ekle("Ayşe Yılmaz (Yönetici)", "yonetici")
         depo.kullanici_ekle("Mehmet Demir", "eleman")
