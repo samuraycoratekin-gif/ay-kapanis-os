@@ -1589,12 +1589,70 @@ def _varsayilan_kiraci_seed():
     depo._yaz(kiraci.KIRACILAR_JSON, kayitlar)
 
 
-def _optimed_kiraci_seed():
-    """Optimed demo kiracisini olusturur (idempotent: zaten varsa atlar).
-    Mutabakat modulu etkin; ornek Excel'ler tenant dizinine kopyalanir."""
-    if kiraci.kiraci_getir_eposta("demo@optimed.com.tr"):
+def _optimed_mukellef_yaz(kid):
+    """Optimed tenant icin mukellefler.json + ornek Excel'leri idempotent kurar.
+    Tenant onceden olusturulmus olsa bile guvenle tekrar calistirilabilir:
+    mukellefler.json yoksa yazar, Excel'ler yoksa kopyalar, varsa dokunmaz."""
+    import shutil, json as _json
+    burada = os.path.dirname(os.path.abspath(__file__))
+    kaynak  = os.path.join(burada, "moduller", "mutabakat", "ornek_veri")
+    mut_kok = os.path.join(depo.ROOT_VERI, "kiracilar", kid, "mutabakat")
+    ornek   = os.path.join(mut_kok, "ornek")
+    os.makedirs(ornek, exist_ok=True)
+
+    # Optimed ornek Excel'leri — yoksa kopyala, varsa birakit
+    for dosya in ("optimed_logo.xlsx", "optimed_sgk.xlsx", "optimed_gib.xlsx"):
+        hedef_dosya = os.path.join(ornek, dosya)
+        if not os.path.exists(hedef_dosya):
+            src = os.path.join(kaynak, dosya)
+            if os.path.exists(src):
+                shutil.copy2(src, hedef_dosya)
+
+    # mukellefler.json — yoksa yaz; varsa VARSAYILAN iceriyorsa ustune yaz
+    muk_yol = os.path.join(mut_kok, "mukellefler.json")
+    mevcut  = {}
+    if os.path.exists(muk_yol):
+        try:
+            with open(muk_yol, encoding="utf-8") as f:
+                mevcut = _json.load(f)
+        except Exception:
+            pass
+    # Optimed'e ozel kayit zaten varsa dokunma
+    kodlar = [m.get("kod") for m in mevcut.get("mukellefler", [])]
+    if "OPT-SGK" in kodlar:
         return
+
+    mukellefler_cfg = {
+        "_aciklama": "Optimed Saglik Grubu — Haziran 2026 SGK/Sigorta/Kurumsal mutabakati.",
+        "varsayilan": "OPT-SGK",
+        "mukellefler": [
+            {
+                "kod": "OPT-SGK",
+                "unvan": "SGK – Cerkezkoy / Corlu / Kapakli (3 Hastane)",
+                "sektor": "Saglik / Kamu Odeyici",
+                "donem": "Haziran 2026",
+                "motor": True,
+                "veri": {
+                    "bizim": "ornek/optimed_logo.xlsx",
+                    "karsi": "ornek/optimed_sgk.xlsx",
+                    "gib":   "ornek/optimed_gib.xlsx",
+                },
+            },
+        ],
+    }
+    with open(muk_yol, "w", encoding="utf-8") as f:
+        _json.dump(mukellefler_cfg, f, ensure_ascii=False, indent=2)
+
+
+def _optimed_kiraci_seed():
+    """Optimed demo kiracisini olusturur + mukellef/Excel yapisi kurar.
+    Tenant zaten mevcutsa yalnizca eksik mukellef/Excel kurulumunu tamamlar."""
     try:
+        mevcut = kiraci.kiraci_getir_eposta("demo@optimed.com.tr")
+        if mevcut:
+            # Tenant zaten var; yalnizca mukellef/Excel eksikse kur
+            _optimed_mukellef_yaz(mevcut["id"])
+            return
         k = kiraci.kiraci_ekle(
             unvan="Optimed Sağlık Grubu",
             eposta="demo@optimed.com.tr",
@@ -1603,19 +1661,9 @@ def _optimed_kiraci_seed():
             paket="pilot",
             moduller=["ay_kapanis", "mutabakat"],
         )
-        kid = k["id"]
-        # Optimed ornek Excel'lerini tenant'in mutabakat/ornek dizinine kopyala
-        import shutil
-        burada = os.path.dirname(os.path.abspath(__file__))
-        kaynak = os.path.join(burada, "moduller", "mutabakat", "ornek_veri")
-        hedef  = os.path.join(depo.ROOT_VERI, "kiracilar", kid, "mutabakat", "ornek")
-        os.makedirs(hedef, exist_ok=True)
-        for dosya in ("optimed_logo.xlsx", "optimed_sgk.xlsx", "optimed_gib.xlsx"):
-            src = os.path.join(kaynak, dosya)
-            if os.path.exists(src):
-                shutil.copy2(src, os.path.join(hedef, dosya))
+        _optimed_mukellef_yaz(k["id"])
     except Exception:
-        pass  # zaten varsa veya hata: sessizce gec
+        pass  # hata: sessizce gec
 
 
 def seed():
