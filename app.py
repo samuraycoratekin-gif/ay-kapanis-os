@@ -1619,29 +1619,45 @@ def _optimed_mukellef_yaz(kid):
             pass
     # Optimed'e ozel kayit zaten varsa dokunma
     kodlar = [m.get("kod") for m in mevcut.get("mukellefler", [])]
-    if "OPT-SGK" in kodlar:
-        return
-
-    mukellefler_cfg = {
-        "_aciklama": "Optimed Saglik Grubu — Haziran 2026 SGK/Sigorta/Kurumsal mutabakati.",
-        "varsayilan": "OPT-SGK",
-        "mukellefler": [
-            {
-                "kod": "OPT-SGK",
-                "unvan": "SGK – Cerkezkoy / Corlu / Kapakli (3 Hastane)",
-                "sektor": "Saglik / Kamu Odeyici",
-                "donem": "Haziran 2026",
-                "motor": True,
-                "veri": {
-                    "bizim": "ornek/optimed_logo.xlsx",
-                    "karsi": "ornek/optimed_sgk.xlsx",
-                    "gib":   "ornek/optimed_gib.xlsx",
+    if "OPT-SGK" not in kodlar:
+        mukellefler_cfg = {
+            "_aciklama": "Optimed Saglik Grubu — Haziran 2026 SGK/Sigorta/Kurumsal mutabakati.",
+            "varsayilan": "OPT-SGK",
+            "mukellefler": [
+                {
+                    "kod": "OPT-SGK",
+                    "unvan": "SGK – Cerkezkoy / Corlu / Kapakli (3 Hastane)",
+                    "sektor": "Saglik / Kamu Odeyici",
+                    "donem": "Haziran 2026",
+                    "motor": True,
+                    "veri": {
+                        "bizim": "ornek/optimed_logo.xlsx",
+                        "karsi": "ornek/optimed_sgk.xlsx",
+                        "gib":   "ornek/optimed_gib.xlsx",
+                    },
                 },
+            ],
+        }
+        with open(muk_yol, "w", encoding="utf-8") as f:
+            _json.dump(mukellefler_cfg, f, ensure_ascii=False, indent=2)
+
+    # cari_mailler.json — tum Optimed carileri samuray@azamol.ai'a yonlendir
+    # (OTP gonderimi ve mutabakat maili bu adrese gider; test icin idealdir)
+    TEST_MAIL = "samuray@azamol.ai"
+    mail_yol = os.path.join(mut_kok, "cari_mailler.json")
+    if not os.path.exists(mail_yol):
+        cari_mailler = {
+            "varsayilan_karsi": TEST_MAIL,
+            "cariler": {
+                "120.01.001": TEST_MAIL,   # SGK / Cerkezkoy
+                "120.01.002": TEST_MAIL,   # SGK / Corlu
+                "120.01.003": TEST_MAIL,   # SGK / Kapakli
+                "120.02.001": TEST_MAIL,   # Acibademin Tamamlayici Sigorta
+                "120.03.001": TEST_MAIL,   # Kurumsal / OSB
             },
-        ],
-    }
-    with open(muk_yol, "w", encoding="utf-8") as f:
-        _json.dump(mukellefler_cfg, f, ensure_ascii=False, indent=2)
+        }
+        with open(mail_yol, "w", encoding="utf-8") as f:
+            _json.dump(cari_mailler, f, ensure_ascii=False, indent=2)
 
 
 def _optimed_kiraci_seed():
