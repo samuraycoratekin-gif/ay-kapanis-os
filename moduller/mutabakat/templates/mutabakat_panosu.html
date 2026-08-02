@@ -554,8 +554,12 @@ function guncelTablo(){
       ?`<input type="checkbox" ${seciliG.has(r.kod)?'checked':''} onclick="tikleG('${r.kod}',this.checked)" title="Tekrar gönderime seç">`
       :`<span title="Mutabık — kilitli">🔒</span>`;
     const acikHtml=r.durum==="ITIRAZLI"
-      ?`<button class="acikbtn" onclick="acAciklama('${r.kod}')">📋 Eksikleri gör</button>`
+      ?`<button class="acikbtn" onclick="acAciklama('${r.kod}')">📋 Farkı gör</button>`
       :`<span class="bos">—</span>`;
+    // Itirazli durum etiketinin kendisi de tiklanabilir: dogrudan karsilastirmayi acar.
+    const pillHtml=r.durum==="ITIRAZLI"
+      ?`<span class="pill ${cls}" style="cursor:pointer" title="Karşılaştırmayı aç" onclick="acAciklama('${r.kod}')">${txt} 🔍</span>`
+      :`<span class="pill ${cls}">${txt}</span>`;
     return `<tr>
       <td>${tikHtml}</td>
       <td class="kod">${r.kod}</td><td class="firma">${r.firma}</td>
@@ -563,7 +567,7 @@ function guncelTablo(){
       <td class="sag">${TL(r.bizim)}</td>
       <td class="sag">${r.durum==="BEKLIYOR"?'<span class="bos">—</span>':TL(r.karsi)}</td>
       <td class="sag">${farkHtml}</td>
-      <td><span class="pill ${cls}">${txt}</span></td>
+      <td>${pillHtml}</td>
       <td>${yanitHtml}</td>
       <td>${acikHtml}</td>
       <td class="tur">${r.tur}. gönderim</td></tr>`;
@@ -795,12 +799,14 @@ function verisiUret(kod,m,i,b){
 //   /api/cari_fark  → her itirazli cari icin biz/karsi eksik + tutar farki + devir
 // Motora erisilemezse mevcut hardcoded VERI ile devam edilir (pano bos kalmaz).
 async function motoraBagla(musteri){
-  const q="?musteri="+encodeURIComponent(musteri);
+  // _=zaman damgasi: tarayici bayat API cevabini onbellekten servis etmesin
+  // (karsi taraf portaldan itiraz edince yenilemede guncel durum gelsin).
+  const q="?musteri="+encodeURIComponent(musteri)+"&_="+Date.now();
   try{
     const [tr,cz,md]=await Promise.all([
-      fetch("/api/triyaj"+q).then(r=>r.json()),
-      fetch("/api/caprazcari"+q).then(r=>r.json()),
-      fetch("/api/maildurum"+q).then(r=>r.json())
+      fetch("/api/triyaj"+q,{cache:"no-store"}).then(r=>r.json()),
+      fetch("/api/caprazcari"+q,{cache:"no-store"}).then(r=>r.json()),
+      fetch("/api/maildurum"+q,{cache:"no-store"}).then(r=>r.json())
     ]);
     if(!tr || !tr.cariler) throw new Error("triyaj bos");
     const mmap=(md&&md.cariler)||{}, mvar=(md&&md.varsayilan_karsi)||"";
